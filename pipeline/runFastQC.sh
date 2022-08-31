@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH -p core
 #SBATCH -n 1
-#SBATCH -t 3:00:00
+#SBATCH -t 4:00:00
 #SBATCH --mail-type=END,FAIL
 
 # fail on ERROR
