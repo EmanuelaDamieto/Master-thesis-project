@@ -16,10 +16,13 @@ BiocManager::install("GenomicRanges")
 ## Import data and inspect data
 
 
-```{r annotation file}
+```{r import annotation file}
 #Set the directory and import the data
 setwd("/mnt/picea/home/edamieto/Git/Master-thesis-project/pipeline")
-spruce_pine <- read.table("../data/gff3/spruce_pine-extended_master_complete.gff3", sep = "\t")
+#spruce_pine <- read.table("../data/gff3/spruce_pine-extended_master_complete.gff3", sep = "\t")
+#spruce_pine <- read.table(gzfile("../reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa.gff3.gz"), sep = "\t")
+spruce_pine <- read.table(gzfile("../reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa_salmon_redundant_mRNA_removed.gff3.gz"), sep = "\t")
+
 
 #gff = general feature format
 
@@ -33,12 +36,13 @@ genes <- subset(spruce_pine, type=="gene")
 introns <- subset(spruce_pine, type=="intron")  
 exons <- subset(spruce_pine, type=="exon")
 cds <- subset(spruce_pine, type=="CDS")
+mrna <- subset(spruce_pine, type=="mRNA")
 
 ```
 
 ## Genomic Ranges package
 This package is used to find the introns inside each gene. 
-```{r}
+```{r data pre-processing}
 #Use genomic ranges package on genes and introns ;)
 #Genomic Ranges works with S4 vectors
 library("GenomicRanges")
@@ -46,6 +50,7 @@ ggenes <- GRanges(genes)
 gintrons <- GRanges(introns)
 
 #Create the overlap
+#gintrons is the query (from), ggenes is the subject (to)
 overlap <- findOverlaps(gintrons, ggenes, type = "within")
 
 head(overlap, 20)
@@ -53,6 +58,44 @@ intr_in_genes <- as.data.frame(table(overlap@to))
 
 intr_in_genes <- as.data.frame(t(apply(intr_in_genes,1, as.numeric)))
 colnames(intr_in_genes) <- c("Gene", "Num_introns")
+
+which.max(intr_in_genes$Num_introns)
+#19191
+intr_in_genes[which.max(intr_in_genes$Num_introns),]
+#gene 32513 with 39546 introns
+ggenes[32513,]
+#PA_chr08 24453721-1397619250
+```
+
+## Analysis of transcripts 
+
+```{r}
+gmRNA <- GRanges(mrna)
+overlap_transcript <- findOverlaps(gintrons, gmRNA, type = "within")
+
+head(overlap_transcript, 20)
+intr_in_transcript <- as.data.frame(table(overlap_transcript@to))
+
+intr_in_transcript <- as.data.frame(t(apply(intr_in_transcript,1, as.numeric)))
+colnames(intr_in_transcript) <- c("mRNA", "Num_introns")
+
+which.max(intr_in_transcript$Num_introns)
+#19191
+intr_in_transcript[which.max(intr_in_transcript$Num_introns),]
+#transcript 75295 with 24188 introns
+gmRNA[75295,]
+#PA_chr05 169244672-1128437636
+intr_in_transcript[which.min(intr_in_transcript$Num_introns),]
+
+ggplot(intr_in_transcript, aes(Num_introns))+
+  geom_density()+
+  labs(x="Num of introns in transcripts", title="Density plot of the number of introns in transcripts")
+
+source("../UPSCb-common/src/R/percentile.R")
+percentile(intr_in_transcript$Num_introns)
+percentile(intr_in_transcript$Num_introns, probs=seq(0.9,1,0.001))
+
+
 ```
 
 
@@ -66,11 +109,11 @@ plot(intr_in_genes, type= "l", lwd=2, main="Plot of gene number vs number of int
 
 
 par(mar=c(4,4,4,4))
-boxplot(intr_in_genes[2], main="Boxplot of the number of introns", ylab = "Number of Introns",
+boxplot(log10(intr_in_genes[2]), main="Boxplot of the number of introns", ylab = "Log of the number of Introns",
         xlim = c(0.5, 1.4))
 
 hist(intr_in_genes[,2], main = "Histogram of the number of introns", 
-     xlab = "Number of introns", xlim = c(0,80), ylim = c(0,14000))
+     xlab = "Number of introns", ylim=c(0,25000),xlim = c(0,300), breaks = 1500)
 ```
 
 Plots of the number of introns with respect to the genes with ggplot package. 
@@ -78,27 +121,24 @@ Plots of the number of introns with respect to the genes with ggplot package.
 library(ggplot2)
 ggplot(intr_in_genes, aes(Gene, Num_introns)) +
   geom_point() +
-  coord_cartesian(xlim=c(0,30000), ylim=c(0,80)) +
+  coord_cartesian(xlim=c(0,55000), ylim=c(0,7000)) +
   labs(x="Genes", y="Number of introns", title="Scatterplot of the number of introns")
 
 ggplot(intr_in_genes, aes(Gene, Num_introns)) +
   geom_point() +
-  coord_cartesian(xlim=c(0,30000), ylim=c(20,80)) +
-  labs(x="Genes", y="Number of introns", title="Scatterplot of the number of introns above 20")
+  coord_cartesian(xlim=c(0,55000), ylim=c(2000,7000)) +
+  labs(x="Genes", y="Number of introns", title="Scatterplot of the number of introns above 2000")
+
 
 ggplot(intr_in_genes, aes(Num_introns)) +
   geom_histogram(binwidth = 2, fill="light blue") +
-  coord_cartesian(xlim=c(0,45), ylim=c(0,10000)) +
+  coord_cartesian(xlim=c(0,300), ylim=c(0,8000)) +
   labs(x="Number of introns", y="Counts", title="Histogram of the number of introns")
 
 counts_intr <- as.data.frame(table(intr_in_genes$Num_introns))
 
 counts_intr <- as.data.frame(t(apply(counts_intr,1, as.numeric)))
 colnames(counts_intr) <- c("Num_introns", "Counts")
-
-ggplot(counts_intr, aes(Num_introns, Counts)) +
-  geom_line() +
-  labs(title="Plot of the counts of the number of introns")
 
 ggplot(counts_intr, aes(Counts,Num_introns)) +
   geom_point()+
@@ -108,22 +148,12 @@ ggplot(counts_intr, aes(Counts,Num_introns)) +
 #sorted
 intr_in_genes_sorted <- intr_in_genes[order(intr_in_genes$Num_introns, decreasing=TRUE),] 
 hist(intr_in_genes_sorted$Num_introns, main="Histogram of the frequency of the number of introns",
-     xlab="# introns", xlim=c(0,80), ylim=c(0,14000))
+     xlab="# introns", xlim=c(0,500))
 plot(intr_in_genes_sorted, main="Scatterplot of the number of introns withing genes")
 
-
-ggplot(intr_in_genes_sorted, aes(Num_introns)) +
-  geom_density()+
-  labs(x="# introns", y="Density", title="Density plot of the number of introns within genes")
-
-ggplot(intr_in_genes_sorted, aes(Num_introns)) +
+ggplot(intr_in_genes_sorted, aes(log10(Num_introns))) +
   geom_boxplot() +
-  labs(x="# introns", title="Boxplot of the number of introns within genes")
-
-ggplot(intr_in_genes_sorted, aes(Num_introns)) +
-  geom_freqpoly(binwidth=2) +
-  labs(x="# introns", y="Counts", title="Plot of the number of introns within genes")
-
+  labs(x="Log # introns", title="Boxplot of the number of introns within genes")
 
 ```
 
@@ -143,22 +173,22 @@ not_chr_counts <- as.data.frame(table(not_chr))
 not_chr_counts[which.max(not_chr_counts$Freq),]
 ```
 
-## Look at transcript with the highest number of introns 
+## Look at gene with the highest number of introns 
 ```{r}
-#Interesting transcript: transcript_126602
+#Interesting transcript: ID=PICABG00010504706
 #check how many exons
-interesting_gene <- ggenes[3388,]
+interesting_gene <- ggenes[32513,]
 gexons <- GRanges(exons)
 gcds <- GRanges(cds)
 over_exons <- findOverlaps(gexons, interesting_gene, type="within")
-#75 exons
-over_inrons <- findOverlaps(gintrons, interesting_gene, type="within")
-#74 introns 
+#46510 exons
+over_introns <- findOverlaps(gintrons, interesting_gene, type="within")
+#39546 introns 
 over_CDS <- findOverlaps(gcds, interesting_gene, type="within")
-#10 CDS
+#42292 CDS
 ```
 
-##Look at the 10 transcript with the highest number of introns
+##Look at the 10 genes with the highest number of introns
 ```{r}
 high_freqintr <- head(intr_in_genes_sorted, 10)
 most_interesting_genes <- ggenes[high_freqintr$Gene,]
@@ -169,15 +199,16 @@ most_interesting_genes
 ```{r}
 #the length is the difference between the intron end and the intron start +1 (if not there is an intron with length 0)
 intron_length <- introns$end-introns$start+1
-boxplot(intron_length, main="Boxplot of intron length", ylab="Intron length")
+boxplot(log10(intron_length), main="Boxplot of intron length", ylab="log intron length")
 max(intron_length)
+#958772783
 
-
-df <- data.frame(Gene=overlap@to, Introns=overlap@from,Intron_length=gintrons@ranges@width)
+df <- data.frame(Gene=overlap@to, Introns=overlap@from,Intron_length=gintrons@ranges@width[overlap@from], seqnames=ggenes@seqnames[subjectHits(overlap),], ranges=ggenes@ranges[subjectHits(overlap),])
 merged <- merge.data.frame(df, intr_in_genes, by="Gene", all.x = TRUE)
 
+
 cor(merged$Num_introns, merged$Intron_length)
-#-0.02274121
+#0.003396114
 
 library(tidyverse)
 
@@ -186,19 +217,49 @@ df_grouped <- merged %>% group_by(Gene)
 
 head(df_grouped)
 
+
 #summarise by sum
 df_new <- df_grouped %>% summarise(
+  Gene=unique(Gene),
   Intron_length=sum(Intron_length),
-  Num_introns= unique(Num_introns)
+  Num_introns= unique(Num_introns),
+  seqnames=unique(seqnames),
+  ranges.start=unique(ranges.start),
+  ranges.end=unique(ranges.end),
+  geneID=unique(geneID)
+  
 )
 
 head(df_new)
 
+write.csv(df_new, file="Introns_within_genes.csv")
+
 ```
+```{r}
+attributes <- mcols(ggenes)$attributes
+att <- strsplit(attributes, split=";")
+geneID_tot <- lapply(att, `[[`, 1)   
+
+geneID_introns_in_genes <- as.character(geneID_tot[intr_in_genes$Gene])
+
+df_complete <- df_new %>% mutate(geneID=geneID_introns_in_genes)
+
+library("plotly")
+
+scatterplot <- ggplot(df_complete, aes(x=Num_introns, y=Intron_length, text=geneID))+
+  geom_point()+
+  labs(x="# introns", y="Intron length", title="Scatterplot of intron length and occurrence")
+
+ggplotly(scatterplot)
+
+
+```
+
+
+
 
 Plot
 ```{r}
-hist(intron_length)
 plot(merged$Num_introns, merged$Intron_length, main="Scatterplot of intron length and occurrence",
      xlab="# introns", ylab="Intron length")
 
@@ -227,10 +288,21 @@ ggplot(df_new, aes(Num_introns, Intron_length))+
   geom_smooth(method="lm")+
   labs(x="# introns", y="Intron length", title="Scatterplot of intron length and occurrence (lm)")
 
+#Transform the axis in log scale 
+ggplot(df_new, aes(log10(Num_introns), log10(Intron_length)))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  labs(x="log # introns", y="log intron length", title="Scatterplot of intron length and occurrence (lm)")
+
 linear_model <- lm(Intron_length~Num_introns, df_new)
 summary(linear_model)
 par(mfrow=c(2,2))
 plot(linear_model)
+
+linear_model_2 <- lm(log10(Intron_length)~log10(Num_introns), df_new)
+summary(linear_model_2)
+par(mfrow=c(2,2))
+plot(linear_model_2)
 
 ggplot(df_new, aes(Num_introns, Intron_length))+
   geom_point()+
@@ -244,7 +316,7 @@ par(mfrow=c(1,1))
 plot(gen_add_mod)
 
 cor(df_new$Num_introns, df_new$Intron_length)
-# 0.5964437
+# 0.9681607
 
 ggplot(df_new, aes(Num_introns, Intron_length))+
   geom_point()+
@@ -259,7 +331,7 @@ plot(loess_mod)
 
 Plot... to be continued
 ```{r}
-ggplot(df_new, aes(Num_introns, log(Intron_length)))+
+ggplot(df_new, aes(Num_introns, log10(Intron_length)))+
   geom_point()+
   labs(x="# introns", y="log(Intron length)", title="Scatterplot of intron length and occurrence")
 
@@ -267,20 +339,20 @@ new_model <- lm(log(Intron_length)~Num_introns, df_new)
 summary(new_model)
 
 
-ggplot(df_new, aes(Num_introns, log(Intron_length)))+
+ggplot(df_new, aes(Num_introns, log10(Intron_length)))+
   geom_point()+
   geom_smooth(method="gam")+
   labs(x="# introns", y="log(Intron length)", title="Scatterplot of intron length and occurrence")
 
-ggplot(df_new, aes(x=Num_introns, y=log(Intron_length)))+
+ggplot(df_new, aes(x=Num_introns, y=log10(Intron_length)))+
   geom_point()+
-  geom_smooth(method="lm", formula= y~log(x))+
+  geom_smooth(method="lm", formula= y~log10(x))+
   labs(x="# introns", y="log(Intron length)", title="Scatterplot of intron length and occurrence")
 
-new_model_2 <- lm(log(Intron_length)~log(Num_introns), df_new)
+new_model_2 <- lm(log(Intron_length)~log10(Num_introns), df_new)
 summary(new_model_2)
 
-ggplot(df_new, aes(log(Num_introns), log(Intron_length)))+
+ggplot(df_new, aes(log(Num_introns), log10(Intron_length)))+
   geom_point()+
   geom_smooth(method="lm", se=TRUE)+
   labs(x="log # introns", y="log(Intron length)", title="Scatterplot of intron length and occurrence")
@@ -290,17 +362,230 @@ ggplot(df_new, aes(log(Num_introns), log(Intron_length)))+
 
 library(LSD)
 
-comparisonplot(df_new$Num_introns, df_new$Intron_length, xlab = "# introns", ylab = "Intron length",
-               xlim=c(0,80), main="Comparison plot of intron length and occurrence")
+comparisonplot(df_new$Num_introns, df_new$Intron_length, xlab = "# introns", ylab = "Intron length", main="Comparison plot of intron length and occurrence", xlim=c(0,3000), ylim=c(0,10000000))
 
 comparisonplot(df_new$Num_introns, df_new$Intron_length, xlab = "# introns", ylab = "Intron length", cor=TRUE,
                xlim=c(0,80), main="Comparison plot of intron length and occurrence,")
 
-comparisonplot(df_new$Num_introns, log(df_new$Intron_length), xlab = "# introns", ylab = "log Intron length", cor = TRUE,
-               xlim=c(0,80), ylim=c(0,15), main="Comparison plot of intron length and occurrence,")
+comparisonplot(df_new$Num_introns, log10(df_new$Intron_length), xlab = "# introns", ylab = "log Intron length", cor = TRUE, xlim=c(0,80), ylim=c(0,15), main="Comparison plot of intron length and occurrence,")
 #zoom in the x axis
-comparisonplot(df_new$Num_introns, log(df_new$Intron_length), xlab = "# introns", ylab = "log Intron length", cor = TRUE,
-               xlim=c(0,20), ylim=c(0,15), main="Comparison plot of intron length and occurrence,")
+comparisonplot(df_new$Num_introns, log(df_new$Intron_length), xlab = "# introns", ylab = "log Intron length", cor = TRUE, xlim=c(0,20), ylim=c(0,15), main="Comparison plot of intron length and occurrence,")
+
+comparisonplot(log10(df_new$Num_introns), log10(df_new$Intron_length), xlab = "log # introns", ylab = "log Intron length", cor = TRUE, main="Comparison plot of intron length and occurrence,")
+abline(y=5)
 
 ```
 
+
+
+#Analysis of genes within introns
+
+```{r}
+# ANALYSIS OF GENES WITHIN INTRONS
+
+#Find genes inside introns
+#In ovl object the query object is ggenes and the subject one is gintrons
+ovl <- findOverlaps(ggenes, gintrons, type="within") #93090 overlap 
+#ovl <- findOverlaps(ggenes, gintrons, type="within",ignore.strand=TRUE)
+#ovl is not empty just if you ignore strand so this mean that every time the intron and the gene are in the opposite strand
+# so opposite direction and this is interesting 
+
+introns_with_genes <- gintrons[subjectHits(ovl),]
+genes_within_introns<- ggenes[queryHits(ovl),]
+
+#check if the genes are in the chromosome 
+par(mar=c(5,5,2,5))
+barplot(sort(table(as.character(seqnames(ggenes[queryHits(ovl),])))),las=2, cex.names = 0.5,
+        ylim = c(0,4000), main="Barplot of the number of genes within introns", ylab = "# of genes within introns")
+
+
+#same genes within different introns???
+head(ovl)
+#the same genes is counted multiple times within different introns. This is due how the script is written 
+
+
+
+#table with gene_id, intron_id, #of occurrence
+
+#401 unique genes, 46 unique genes within introns, 10 unique not chromosomic genes within introns 
+
+#as.character(seqnames(ggenes[queryHits(ovl),]))
+
+
+#CREA UN DF WITH GENE, INTRON TOTAL LENGTH, CHR
+df_within <- data.frame(Gene=ovl@from, Intron=ovl@to, Intron_length=gintrons@ranges@width[ovl@to], chr= as.character(seqnames(ggenes[queryHits(ovl),])))
+
+#Group By gene
+df_grouped_within <- df_within %>% group_by(Gene)
+
+#summarise by sum
+df_new_within <- df_grouped_within %>% summarise(
+  Intron_length=sum(Intron_length),
+  chr=unique(chr)
+)
+
+#df_new_within_sort <- arrange(df_new_within, chr)
+
+ggplot(df_new_within, aes(chr, Intron_length))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+ggplot(df_new_within, aes(chr, log10(Intron_length)))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+## Consider just the genes within the chromosomes
+df_chr_genes <- df_new_within %>% filter(str_detect(chr,  regex(paste0("^PA_chr[0-9]{2}$"))))
+
+ggplot(df_chr_genes, aes(chr, Intron_length))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+#Transform the y axis in log scale 
+ggplot(df_chr_genes, aes(chr, log10(Intron_length)))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length in the chromosomes", x="Chr", y="log of cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+#Add standard deviation (notch)
+ggplot(df_chr_genes, aes(chr, log10(Intron_length)))+
+  geom_boxplot(notch=TRUE)+
+  labs(title="Boxplot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+#Notches are used in box plots to help visually assess whether the medians of distributions differ. 
+#If the notches do not overlap, this is evidence that the medians are different.
+
+#violin plot
+ggplot(df_chr_genes, aes(chr, log10(Intron_length)))+
+  geom_violin(fill= "light blue")+
+  labs(title="Violin plot of cumulative intron length of the chromosomes", x="Chr", y="log cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+## Consider the genes not in the chromosomes
+df_not_chr_genes <- df_new_within %>% filter(str_detect(chr,  regex(paste0("PA_chr[0-9]")), negate = TRUE))
+ggplot(df_not_chr_genes, aes(chr, Intron_length))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of not chromosomic genes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+#Transform the y axis in log scale
+ggplot(df_not_chr_genes, aes(chr, log10(Intron_length)))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of not chromosomic genes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90))
+```
+## Analysis of genes not within introns
+
+```{r}
+#look at the complementary dataset -> genes not in introns, drop genes without introns
+ovl_compl <- findOverlaps(ggenes, gintrons, type="any", ignore.strand= TRUE)
+ovl_compl <- ovl_compl[!ovl_compl %in% ovl]
+
+ovl_compl[ovl_compl@to==0,] #0 objects
+ovl_compl[ovl_compl@from==0,] #0 objects
+
+#create the complement dataframe
+df_compl <- data.frame(Gene=ovl_compl@to, Intron=ovl_compl@from, Intron_length=gintrons@ranges@width[ovl_compl@from], chr= as.character(seqnames(ggenes[queryHits(ovl_compl),])))
+
+#Group By gene
+df_grouped_compl <- df_compl %>% group_by(Gene)
+
+#summarise by sum
+df_new_compl <- df_grouped_compl %>% summarise(
+  Intron_length=sum(Intron_length),
+  chr=unique(chr)
+)
+
+#barplot of chromosome 
+par(mar=c(5,5,4,5))
+barplot(sort(table(as.character(seqnames(ggenes[queryHits(ovl_compl),])))),las=2, cex.names = 0.5,
+        ylim = c(0,10000), main="Barplot of the number of genes not within introns", ylab = "# of genes within introns")
+
+
+#plot
+
+## Consider just the genes within the chromosomes
+df_chr_genes_compl <- df_new_compl %>% filter(str_detect(chr,  regex(paste0("^PA_chr[0-9]{2}$"))))
+
+ggplot(df_chr_genes_compl, aes(chr, Intron_length))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+#Transform the y axis in log scale 
+ggplot(df_chr_genes_compl, aes(chr, log10(Intron_length)))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+#Add standard deviation (notch)
+ggplot(df_chr_genes_compl, aes(chr, log10(Intron_length)))+
+  geom_boxplot(notch=TRUE)+
+  labs(title="Boxplot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90)) 
+
+#violin plot
+ggplot(df_chr_genes_compl, aes(chr, log10(Intron_length)))+
+  geom_violin(fill= "light blue")+
+  labs(title="Violin plot of cumulative intron length of the chromosomes", x="Chr", y="Cumulative intron length")+
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+```{r}
+#Look at the size distribution of the introns per gene
+#look at the median of it
+#summarise by median
+df_median <- df_grouped %>% summarise(
+  Intron_length=median(Intron_length),
+  Num_introns= unique(Num_introns)
+)
+
+head(df_median)
+
+ggplot(df_median, aes(Num_introns, Intron_length))+
+  geom_point()+
+  labs(x="# introns", y="Intron length", title="Scatterplot of intron length and occurrence")
+
+
+
+#look at the mad (the sd but for the median-median absolute deviation mad)
+```
+
+
+```{r}
+#add seqnames and ranges in the df_new dataset
+#take just one intron and probably it will not be the shortest or the longest but something in between but in this way, you'll lose the info
+ovl <- ovl[!duplicated(queryHits(ovl)),]
+
+df_within <- data.frame(Gene=ovl@from, Introns=ovl@to,Intron_length=gintrons@ranges@width[ovl@to], seqnames=ggenes@seqnames[queryHits(ovl),], ranges=ggenes@ranges[queryHits(ovl),])
+#countOverlaps(ggenes, gintrons)
+
+#Group By gene
+df_grouped_within <- df_within %>% group_by(Gene)
+
+#summarise by sum
+df_new_within <- df_grouped_within %>% summarise(
+  Gene=unique(Gene),
+  Intron_length=sum(Intron_length),
+  seqnames=unique(seqnames),
+  ranges.start=unique(ranges.start),
+  ranges.end=unique(ranges.end)
+)
+head(df_new_within)
+
+#same genes within different introns???
+head(ovl)
+#the same genes is counted multiple times within different introns. This is due how the script is written 
+
+write.csv(df_new_within, file="Genes_within_introns.csv")
+
+
+```
+
+
+```{r}
