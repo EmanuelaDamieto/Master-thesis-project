@@ -5,8 +5,8 @@ To use it for your project, you can check this [GitHub gist](https://gist.github
 
 
 ##Set up
-ln -s /mnt/picea/projects/spruce/vhurry/drought-stress-roots/preprosessed data/
-ln -s /mnt/picea/storage/reference/Picea-abies/v2.0/ reference/
-ln -s /mnt/picea/projects/singularity singularity/
+- ln -s /mnt/picea/projects/spruce/vhurry/drought-stress-roots/preprosessed data/
+- ln -s /mnt/picea/storage/reference/Picea-abies/v2.0/ reference/
+- ln -s /mnt/picea/projects/singularity singularity/
 
 
