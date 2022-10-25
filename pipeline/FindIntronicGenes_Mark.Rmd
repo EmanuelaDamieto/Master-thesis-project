@@ -18,10 +18,11 @@ BiocManager::install("GenomicRanges")
 
 ```{r import annotation file}
 #Set the directory and import the data
-setwd("/mnt/picea/home/edamieto/Git/Master-thesis-project/pipeline")
+#setwd("/mnt/picea/home/edamieto/Git/Master-thesis-project/pipeline")
 #spruce_pine <- read.table("../data/gff3/spruce_pine-extended_master_complete.gff3", sep = "\t")
 #spruce_pine <- read.table(gzfile("../reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa.gff3.gz"), sep = "\t")
-spruce_pine <- read.table(gzfile("../reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa_salmon_redundant_mRNA_removed.gff3.gz"), sep = "\t")
+library("here")
+spruce_pine <- read.table(gzfile(here("reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa_salmon_redundant_mRNA_removed.gff3.gz")), sep = "\t")
 
 
 #gff = general feature format
@@ -40,14 +41,342 @@ mrna <- subset(spruce_pine, type=="mRNA")
 
 ```
 
+## Introns in transcripts
+```{r import annotation file}
+#too many introns in findOverlap object -> do it manually from introns object
+parent <- sub(".*=","",introns$attributes)
+table_parents <- table(parent)
+head(table(parent))
+max(table_parents) #74
+table_parents[which.max(table_parents)]
+mrna[str_detect(mrna$attributes, "PICABM00001871025"),]
+
+hist(table_parents, xlab = "# of introns", main="Number of introns in transcripts", xlim=c(0,70), ylim=c(0,90000))
+introns$parent <- parent
+introns$length <- introns$end-introns$start+1
+
+#do plot but with transcripts instead of genes
+
+ID <- sub(";.*","",mrna$attributes)
+ID <- sub("ID=","",ID)
+mrna$ID <- ID
+
+
+introns$counts <- 1
+
+library(dplyr)
+#create a new dataframe, group by parent
+df_introns_in_genes <- introns %>% group_by(parent)
+
+#summarize
+df_introns_in_genes <- df_introns_in_genes %>% summarise(
+  counts= sum(counts),
+  seqid=unique(seqid),
+  length=sum(length),
+  parent=unique(parent)
+)
+
+df_introns_in_genes[which.max(df_introns_in_genes$counts),]
+df_introns_in_genes[which.max(df_introns_in_genes$length),]
+introns[introns$parent=="PICABM00006295253",]
+
+
+df_introns_in_genes_sort <- df_introns_in_genes %>% arrange(desc(length))
+head(df_introns_in_genes_sort$parent,9)
+strange_mRNA <- head(df_introns_in_genes_sort$parent,9)
+introns[introns$parent %in% strange_mRNA,]
+
+
+ggplot(df_introns_in_genes, aes(x=counts, y=length, text=parent))+
+  geom_point()+
+  labs(x="# introns", y="Intron length", title="Scatterplot of intron length and occurrence")
+
+
+boxplot(log10(df_introns_in_genes$length), main= "Boxplot of intron length and occurrence")
+
+
+df_introns_in_genes_without_outliers <- df_introns_in_genes %>% filter(!parent %in% strange_mRNA,)
+
+ggplot(df_introns_in_genes_without_outliers, aes(x=counts, y=length, text=parent))+
+  geom_point()+
+  labs(x="# introns", y="Intron length", title="Scatterplot of intron length and occurrence")
+
+comparisonplot(df_introns_in_genes_without_outliers$counts, df_introns_in_genes_without_outliers$length, xlab ="# introns", ylab = "Intron length", main="Comparison plot of number of introns vs intron length", xlim=c(0,100))
+
+comparisonplot(log10(df_introns_in_genes_without_outliers$counts), log10(df_introns_in_genes_without_outliers$length), xlab ="log # introns", ylab = "log intron length", main="Comparison plot of number of introns vs intron length", xlim= c(0,5))
+
+ggplot(df_introns_in_genes_without_outliers, aes(x=counts, y=length))+
+  geom_density_2d()+
+  labs(x="# introns", y="Intron length", title="Density plot of intron length and occurrence")
+
+hist(df_introns_in_genes_without_outliers$length, xlim=c(0,700000), main="Histogram of intron length", xlab="Intron length")
+
+```
+
+## Analysis of the two peaks
+
+```{r}
+#set the threshold of log intron length to 4
+long_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)>4)
+short_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)<4)
+long_introns_id <- long_introns$parent
+short_introns_id <- short_introns$parent
+
+
+
+violin_long <- ggplot(long_introns, aes(log10(counts), log10(length)))+
+  geom_violin(fill="light blue")+
+  labs(x="log 10 # introns", y="log 10 length of introns", title="Violin plot of long introns")
+
+violin_small <- ggplot(short_introns, aes(log10(counts), log10(length)))+
+  geom_violin(fill="light blue")+
+  labs(x="log 10 # introns", y="log 10 length of introns", title="Violin plot of short introns")
+
+library(ggtree)
+
+multiplot(violin_long, violin_small, ncol=2)
+
+
+
+#comparison intron length vs transcript length 
+mrna_length <- mrna$end-mrna$start+1
+mrna$mrna_length <- mrna_length
+
+
+mrna_id_length <- mrna %>% select(ID, mrna_length)
+#long introns
+long_introns_mrna <- long_introns %>% left_join(mrna_id_length, by= c("parent"="ID"), suffix=c("intron", "mRNA"))
+
+
+ggplot(long_introns_mrna, aes(x=length, y=mrna_length))+
+  geom_point()+
+  labs(x="intron introns", y="transcript length", title="Scatterplot of intron length and transcript length")
+
+intron_percentage <- long_introns_mrna$length/long_introns_mrna$mrna_length
+long_introns_mrna <- long_introns_mrna %>% add_column(intron_percentage)
+
+hist(long_introns_mrna$intron_percentage, breaks= 20, xlim=c(0.7,1), ylim=c(0,50000), xlab="intron length/transcript length", main="Histogram of intron length/transcript length in long introns")
+#short introns
+short_introns_mrna <- short_introns %>% left_join(mrna_id_length, by= c("parent"="ID"), suffix=c("intron", "mRNA"))
+
+
+ggplot(short_introns_mrna, aes(x=length, y=mrna_length))+
+  geom_point()+
+  labs(x="intron introns", y="transcript length", title="Scatterplot of intron length and transcript length")
+
+intron_percentage_short <- short_introns_mrna$length/short_introns_mrna$mrna_length
+short_introns_mrna <- short_introns_mrna %>% add_column(intron_percentage_short)
+
+hist(short_introns_mrna$intron_percentage_short, breaks= 20, xlab="intron length/transcript length", main="Histogram of intron length/transcript length in short introns")
+
+#average intron length and sd
+mean(long_introns_mrna$length) #164546.3
+sd(long_introns_mrna$length) #131363.6
+
+mean(short_introns_mrna$length) #1759.762
+sd(short_introns_mrna$length) #2133.828
+
+
+
+boxplot(list(long_introns=log10(long_introns_mrna$length), short_introns=log10(short_introns_mrna$length)), ylab="log intron length", main="Boxplot of cumulative intron length", col="bisque")
+
+
+```
+## Intron length vs exon length 
+```{r}
+#create a dataset with exon length and exon counts 
+parent_exon <- sub(".*=","",exons$attributes)
+table_parents_exon <- table(parent_exon)
+head(table(parent_exon))
+max(table_parents_exon) #75
+table_parents[which.max(table_parents)]
+mrna[str_detect(mrna$attributes, "PICABM00001871025"),]
+
+```
+
+
+## Intron length vs CDS length 
+
+```{r}
+head(cds)
+parent_cds <- sub(".*=","",cds$attributes)
+table_parents_cds <- table(parent_cds)
+head(table(parent_cds))
+table_parents_cds <- table_parents_cds[-which(table_parents_cds=="13499")]
+max(table_parents_cds) #65
+table_parents_cds[which.max(table_parents_cds)] #PICABM00011984427
+mrna[str_detect(mrna$attributes, "PICABM00011984427"),]
+
+
+
+```
+
+
+## Average intron length 
+
+```{r}
+#average intron length per gene (and sd -> do a boxplot)
+#create a new dataframe, group by parent
+df_introns_in_genes <- introns %>% group_by(parent)
+df_introns_in_genes_mean <- df_introns_in_genes %>% summarise(
+  counts= sum(counts),
+  seqid=unique(seqid),
+  length=mean(length),
+  parent=unique(parent)
+)
+
+df_introns_in_genes_mean_without_outliers <- df_introns_in_genes_mean %>% filter(!parent %in% strange_mRNA,)
+
+head(df_introns_in_genes_mean_without_outliers)
+
+comparisonplot(df_introns_in_genes_mean_without_outliers$counts, df_introns_in_genes_mean_without_outliers$length, xlab ="# introns", ylab = "Intron length", main="Comparison plot of number of introns vs intron length", xlim=c(0,100))
+
+comparisonplot(log10(df_introns_in_genes_mean_without_outliers$counts), log10(df_introns_in_genes_mean_without_outliers$length), xlab ="log # introns", ylab = "log intron length", main="Comparison plot of number of introns vs intron length", xlim= c(0,5))
+
+
+long_introns_mean <- df_introns_in_genes_mean_without_outliers %>% filter(log10(length)>3.5)
+short_introns_mean <- df_introns_in_genes_mean_without_outliers %>% filter(log10(length)<3.5)
+
+
+
+boxplot(list(long_introns=log10(long_introns_mean$length),short_introns=log10(short_introns_mean$length)), ylab="log intron length", main="Boxplot of average intron length in long and short introns", col="bisque")
+
+```
+## Analysis of intron length in small and long transcript
+```{r}
+
+df_introns_in_genes_without_outliers_no_summarise <- introns %>% filter(!parent %in% strange_mRNA,)
+
+df_long_introns <- df_introns_in_genes_without_outliers_no_summarise %>% filter(parent %in% long_introns_id,)
+
+df_short_introns <- df_introns_in_genes_without_outliers_no_summarise %>% filter(parent %in% short_introns_id,)
+
+boxplot(list(long_introns=log10(df_long_introns$length), short_introns=log10(df_short_introns$length)), ylab="log intron length",main="Boxplot of intron length", notch=TRUE)
+
+```
+## Weighted intron length 
+```{r}
+#measure introns length as the ratio between the length of the longest intron and the sum of intron length (length longest intorn/sum of intron length)
+df_introns_in_genes <- introns %>% group_by(parent)
+df_introns_in_genes_weight <- df_introns_in_genes %>% summarise(
+  counts= sum(counts),
+  seqid=unique(seqid),
+  length=max(length)/sum(length),
+  parent=unique(parent)
+)
+
+df_introns_in_genes_weight_without_outliers <- df_introns_in_genes_weight %>% filter(!parent %in% strange_mRNA,)
+
+head(df_introns_in_genes_weight_without_outliers)
+
+#PICABM00000054819: 197/297=0.66
+#PICABM00000054842: 1
+#PICABM00000054850: 222/318=0.698
+df_introns_in_genes_weight_without_outliers[which(df_introns_in_genes_weight_without_outliers$parent=="PICABM00000054850"),]
+
+#comparison plot of the weighted intron length 
+comparisonplot(df_introns_in_genes_weight_without_outliers$counts, df_introns_in_genes_weight_without_outliers$length, xlab ="# introns", ylab = "Weighted intron length", main="Comparison plot of number of introns vs intron length", ylim=c(0,1))
+
+
+long_introns_id <- long_introns$parent
+short_introns_id <- short_introns$parent
+
+df_long_introns_weight <- df_introns_in_genes_weight_without_outliers %>% filter(parent %in% long_introns_id,)
+df_short_introns_weight <- df_introns_in_genes_weight_without_outliers %>% filter(parent %in% short_introns_id,)
+
+df_long_introns_mean <- df_introns_in_genes_mean_without_outliers %>% filter(parent %in% long_introns_id,)
+df_short_introns_mean <- df_introns_in_genes_mean_without_outliers %>% filter(parent %in% short_introns_id,)
+
+df_long_introns_sum <- df_introns_in_genes_without_outliers %>% filter(parent %in% long_introns_id,)
+df_short_introns_sum <- df_introns_in_genes_without_outliers %>% filter(parent %in% short_introns_id,)
+
+boxplot(list(long_introns=df_long_introns_weight$length, short_introns=df_short_introns_weight$length), ylab="Weighted intron length",main="Boxplot of weighted intron length", notch=TRUE, col="bisque")
+
+#comparison plot of long transcripts 
+comparisonplot(df_long_introns_weight$counts, df_long_introns_weight$length, xlab ="# introns", ylab = "Weighted intron length", main="Comparison plot of number of introns vs intron length in long transcripts", ylim=c(0,1))
+
+#comparison plot of short transcripts 
+comparisonplot(df_short_introns_weight$counts, df_short_introns_weight$length, xlab ="# introns", ylab = "Weighted intron length", main="Comparison plot of number of introns vs intron length in short transcripts", ylim=c(0,1))
+
+
+#Histogram of # of introns
+hist(df_introns_in_genes_weight_without_outliers$counts, main="Histogram of the number of introns per transcript", xlab="# introns", xlim=c(0,80))
+
+
+#Do 1-15 with step=1 and 15+ 
+df_introns_in_genes_weight_without_outliers%>% group_by(counts) %>% boxplot()
+
+
+ggplot(df_introns_in_genes_weight_without_outliers)+
+  geom_boxplot(aes(x=factor(counts ), y=length))+
+  labs(title="Boxplot of the weighted intron length", x="# introns", y="Weighted intron length")
+
+ggplot(df_introns_in_genes_weight_without_outliers %>% mutate(counts=ifelse(counts>15,15,counts)))+
+  geom_boxplot(aes(x=factor(counts ), y=length))+
+  labs(title="Boxplot of the weighted intron length", x="# introns", y="Weighted intron length")
+
+
+
+#Boxplot of long transcripts
+ggplot(df_long_introns_weight  %>% mutate(counts=ifelse(counts>15,15,counts)))+
+  geom_boxplot(aes(x=factor(counts), y=length), notch=TRUE)+
+  labs(title="Boxplot of the weighted intron length in long transcripts", x="# introns", y="Weighted intron length")
+
+median_long_introns <- df_long_introns_weight  %>% mutate(counts=ifelse(counts>15,15,counts)) %>% group_by(counts) %>% summarise(length= median(length))
+median_long_introns$type <- "long"
+
+#Boxplot of short transcripts
+ggplot(df_short_introns_weight %>% mutate(counts=ifelse(counts>15,15,counts)))+
+  geom_boxplot(aes(x=factor(counts), y=length), notch=TRUE)+
+  labs(title="Boxplot of the weighted intron length in short transcripts", x="# introns", y="Weighted intron length")
+
+median_short_introns <- df_short_introns_weight  %>% mutate(counts=ifelse(counts>15,15,counts)) %>% group_by(counts) %>% summarise(length= median(length))
+median_short_introns$type <- "short"
+
+
+median <- union(median_long_introns, median_short_introns)
+
+ggplot(median, aes(counts, length, color=type))+
+  geom_point()+
+  geom_smooth(formula = y ~ splines::ns(x, 1))+
+  labs(title="Plot of the median of long and short trancripts", x="# introns", y="Median weighted length", ylim=c(0,1))
+
+
+#length vs cumulative length
+plot(df_introns_in_genes_without_outliers$length,df_introns_in_genes_weight_without_outliers$length, main="Scatterplot of cumulative length vs weighted length", xlab="Cumulative length", ylab="Weighted length") 
+  #abline(reg = lm(df_introns_in_genes_weight_without_outliers$length~df_introns_in_genes_without_outliers$length), col="red")
+
+comparisonplot(df_introns_in_genes_without_outliers$length,df_introns_in_genes_weight_without_outliers$length, main="Comparisonplot of cumulative length vs weighted length", xlab="Cumulative length", ylab="Weighted length", ylim=c(0,1))
+
+#long transcript
+plot(df_long_introns_sum$length,df_long_introns_weight$length, main="Scatterplot of cumulative length vs weighted length in long transcripts", xlab="Cumulative length", ylab="Weighted length")
+
+comparisonplot(df_long_introns_sum$length,df_long_introns_weight$length, main="Comparisonplot of cumulative length vs weighted length in long transcripts", xlab="Cumulative length", ylab="Weighted length", ylim=c(0,1))
+
+#short transcript
+plot(df_short_introns_sum$length,df_short_introns_weight$length, main="Scatterplot of cumulative length vs weighted length in short transcripts", xlab="Cumulative length", ylab="Weighted length") 
+
+comparisonplot(df_short_introns_sum$length,df_short_introns_weight$length, main="Comparisonplot of cumulative length vs weighted length in short transcripts", xlab="Cumulative length", ylab="Weighted length", ylim=c(0,1))
+
+```
+
+
+
+
+
 ## Genomic Ranges package
 This package is used to find the introns inside each gene. 
 ```{r data pre-processing}
 #Use genomic ranges package on genes and introns ;)
 #Genomic Ranges works with S4 vectors
+
+mrna_clean <- mrna %>% separate(attributes, c("ID", "Parent", "Name"), ";") %>% mutate (ID= sub("ID=","", ID), Parent= sub("Parent=","",Parent), Name= sub("Name=","",Name)) %>% filter(!Parent %in% strange_mRNA,)
+
+#specify the columns you want in the granges objects
 library("GenomicRanges")
 ggenes <- GRanges(genes)
 gintrons <- GRanges(introns)
+
 
 #Create the overlap
 #gintrons is the query (from), ggenes is the subject (to)
@@ -59,12 +388,20 @@ intr_in_genes <- as.data.frame(table(overlap@to))
 intr_in_genes <- as.data.frame(t(apply(intr_in_genes,1, as.numeric)))
 colnames(intr_in_genes) <- c("Gene", "Num_introns")
 
+max(intr_in_genes$Num_introns)
+#39546
 which.max(intr_in_genes$Num_introns)
 #19191
 intr_in_genes[which.max(intr_in_genes$Num_introns),]
 #gene 32513 with 39546 introns
 ggenes[32513,]
 #PA_chr08 24453721-1397619250
+
+
+
+counts_overlap <- countOverlaps(gintrons, ggenes, type="within")
+counts_overlap[which.max(counts_overlap)]
+subsetByOverlaps(gintrons, ggenes, type="within")
 ```
 
 ## Analysis of transcripts 
@@ -585,6 +922,342 @@ head(ovl)
 write.csv(df_new_within, file="Genes_within_introns.csv")
 
 
+```
+
+#rtracklayer
+
+```{r}
+library("rtracklayer")
+gff3 <- import.gff3("../reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa_salmon_redundant_mRNA_removed.gff3.gz")
+
+#Length of the transcript/intron/exon/CDS...
+width(gff3)
+
+seqnames(gff3)
+ranges(gff3)
+
+#remove outliers
+#gff3 before cleaning 3727141
+gff3 <- gff3[!gff3$ID %in% strange_mRNA,]
+gff3 <- gff3[!as.character(gff3$Parent) %in% strange_mRNA,]
+#gff3 after cleaning 3726862
+
+#gff3 <- gff3[!parent %in% strange_mRNA,]
+#gff3 <- gff3[!ID %in% strange_mRNA,]
+
+gff3[gff3$ID %in% strange_mRNA,]
+
+
+gff3_gene <- gff3[which(gff3$type=="gene"),]
+gff3_intron <- gff3[which(gff3$type=="intron"),]
+
+gff3_overlap <- findOverlaps(gff3_intron, gff3_gene, type = "within")
+
+gff3_mrna <- gff3[which(gff3$type=="mRNA")]
+
+gff3_exon <- gff3[which(gff3$type=="exon")]
+
+table(gff3_overlap@to)
+#max 53186
+#which.max 1289727
+width(gff3_gene)
+
+max(width(gff3_gene))
+#1373165530
+which.max(width(gff3_gene))
+gff3_gene[32513,]
+
+#PICABG00010504706
+longest_gene <- subset(gff3, subset(gff3$Parent=="PICABG00010504706"))
+longest_gene$type
+
+
+gff3_intron$counts <- 1
+
+df_introns <- data.frame(seqnames=seqnames(gff3_intron), ranges= ranges(gff3_intron),strand= strand(gff3_intron),type=gff3_intron$type,
+                         ID=gff3_intron$ID, Parent=gff3_intron$Parent, counts=gff3_intron$counts)
+
+df_introns_elaborated <- df_introns %>% group_by(Parent.value) %>%
+  summarise(width=sum(ranges.width), counts=sum(counts))
+
+
+df_genes <- data.frame(seqnames=seqnames(gff3_gene), ranges= ranges(gff3_gene),strand= strand(gff3_gene),type=gff3_gene$type,ID=gff3_gene$ID)
+
+gff3_mrna$counts <- 1
+df_mrna <- data.frame(seqnames=seqnames(gff3_mrna), ranges= ranges(gff3_mrna),strand= strand(gff3_mrna),type=gff3_mrna$type,
+                         ID=gff3_mrna$ID, Parent=gff3_mrna$Parent, counts=gff3_mrna$counts)
+
+
+df_mrna_grouped <- df_mrna %>% group_by(Parent.value)
+
+df_mrna_summarize <- df_mrna_grouped %>% summarise(width=sum(ranges.width), counts=sum(counts))
+
+max(df_mrna_summarize$counts)
+#76
+which.max(df_mrna_summarize$counts)
+#51133
+df_mrna_summarize[51133,]
+#PICABG00017828298
+
+df_genes[which(df_genes$ID=="PICABG00017828298"),]
+#290874
+df_mrna[which(df_mrna$Parent.value=="PICABG00017828298"),]
+#PICABM00017828299 -> longest transcript in the gene with the highest number of transcripts, 290871 bp
+
+df_introns_elaborated[which(df_introns_elaborated$Parent.value=="PICABM00017828299"),]
+#9 introns, width 289455 -> 1416 bp exons
+df_introns[which(df_introns$Parent.value=="PICABM00017828299"),]
+
+```
+
+##Gene and intron length against CDS length 
+```{r}
+gff3_cds <- gff3[which(gff3$type=="CDS")]
+gff3_cds$counts <- 1
+
+df_cds <- data.frame(seqnames=seqnames(gff3_cds), ranges= ranges(gff3_cds),strand= strand(gff3_cds),type=gff3_cds$type,
+                         ID=gff3_cds$ID, Parent=gff3_cds$Parent, counts=gff3_cds$counts)
+
+df_cds_grouped <- df_cds %>% group_by(Parent.value)
+
+df_cds_summarize <- df_cds_grouped %>% summarise(width=sum(ranges.width), counts=sum(counts))
+
+merge_cds_intron <- df_cds_summarize %>% full_join(df_introns_elaborated, by="Parent.value", suffix=c(".cds",".intron"), na.matches=c("na","na"))
+
+#analyze merge object
+
+merge_cds_intron[which(is.na(merge_cds_intron$width.intron)),]
+#35965
+merge_cds_intron[which(is.na(merge_cds_intron$width.cds)),]
+#9
+
+
+
+#merge_cds_intron[order(merge_cds_intron$width.intron, decreasing = TRUE),]
+ggplot(merge_cds_intron, aes(width.cds, width.intron))+
+  geom_point()+
+  labs(x="CDS length", y="Intron length", title = "Scatterplot of CDS length vs intron length")
+
+ggplot(merge_cds_intron, aes(width.cds, width.intron))+
+  geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  labs(x="CDS length", y="Intron length", title = "Scatterplot of CDS length vs intron length in log scale")
+
+
+
+
+comparisonplot(merge_cds_intron$width.cds, merge_cds_intron$width.intron, xlab="CDS length", ylab="Intron length", main="Comparisonplot of CDS length vs intron length", xlim=c(0,16000))
+
+comparisonplot(log10(merge_cds_intron$width.cds), log10(merge_cds_intron$width.intron), xlab="CDS length", ylab="Intron length", main="Comparisonplot of CDS length vs intron length in log scale")
+
+comparisonplot(merge_cds_intron$width.cds, merge_cds_intron$width.intron, log="xy", xlab="CDS length", ylab="Intron length", main="Comparisonplot of CDS length vs intron length in log scale")
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+cds_mrna <- df_cds %>% full_join(df_mrna, by=c("Parent.value"="ID"), suffix=c(".cds",".mrna"), na.matches=c("na","na"))
+
+cds_mrna_grouped <- cds_mrna %>% group_by(ID, Parent.value.mrna)
+
+#cds_mrna_summarize <- cds_mrna_grouped %>% summarise(ranges.width.cds=sum(ranges.width.cds), ranges.width.mrna=unique(ranges.width.mrna))
+
+library("ggplot2")
+
+ggplot(cds_mrna_grouped, aes(ranges.width.cds, ranges.width.mrna))+
+  geom_point()+
+  labs(x="CDS length", y="Transcript length", title = "Scatterplot of CDS length vs transcript length")
+
+
+ggplot(cds_mrna_grouped, aes(ranges.width.cds, ranges.width.mrna))+
+  geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  labs(x="CDS length", y="Transcript length", title = "Scatterplot of CDS length vs transcript length")
+
+
+comparisonplot(cds_mrna_grouped$ranges.width.cds, cds_mrna_grouped$ranges.width.mrna, xlab="CDS length", ylab="Transcript length", main="Comparisonplot of CDS length vs transcript length", xlim=c(0,10000))
+
+
+comparisonplot(log10(cds_mrna_grouped$ranges.width.cds), log10(cds_mrna_grouped$ranges.width.mrna), xlab="CDS length", ylab="Transcript length", main="Comparisonplot of CDS length vs transcript length")
+
+comparisonplot(cds_mrna_grouped$ranges.width.cds, cds_mrna_grouped$ranges.width.mrna, log="xy", xlab="CDS length", ylab="Transcript length", main="Comparisonplot <br> of CDS length vs transcript length")
+
+#54 transcripts without CDS out of 1003638
+
+#zoom long CDS
+ggplot(cds_mrna_grouped, aes(ranges.width.cds, ranges.width.mrna))+
+  geom_point()+
+  xlim(7500,10000)+
+  ylim(0,50000)+
+  labs(x="CDS length", y="Transcript length", title = "Scatterplot of CDS length vs transcript length")
+
+#Play with plot
+ggplot(cds_mrna_grouped, aes(ranges.width.cds, ranges.width.mrna))+
+  geom_hex()+
+  labs(x="CDS length", y="Transcript length", title = "Scatterplot of CDS length vs transcript length")
+
+
+ggplot(cds_mrna_grouped, aes(ranges.width.cds, ranges.width.mrna))+
+  geom_bin2d(bins = 500)+
+  labs(x="CDS length", y="Transcript length", title = "Scatterplot of CDS length vs transcript length")
+
+ggplot(cds_mrna_grouped, aes(ranges.width.cds))+
+  geom_histogram()+
+  xlim(0,2000)+
+  labs(x="CDS length", y="Count", title = "Histogram of CDS length")
+
+```
+
+#Split long transcripts and short transcripts
+```{r, CDS length in transcript with long and short introns}
+#Split the transcript in two based on intron length. In this way we'll lose the transcript without introns 
+long_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)>4)
+short_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)<4)
+long_introns_id <- long_introns$parent
+short_introns_id <- short_introns$parent
+
+
+#cds_long_transcript <- cds_mrna_grouped %>% filter(Parent.value %in% long_introns_id,)
+cds_long_transcript <- cds_mrna_grouped[which(cds_mrna_grouped$Parent.value %in% long_introns_id),]
+
+#cds_short_transcript <- cds_mrna_grouped %>% filter(Parent.value %in% short_introns_id,)
+cds_short_transcript <- cds_mrna_grouped[which(cds_mrna_grouped$Parent.value %in% short_introns_id),]
+
+
+#Solve the problem with the title
+
+comparisonplot(cds_long_transcript$ranges.width.cds, cds_long_transcript$ranges.width.mrna, xlab="CDS length", ylab="Transcript length", main="Comparisonplot of CDS length vs transcript length in transcripts with long introns", xlim=c(0,10000))
+
+#Try with \n
+comparisonplot(log10(cds_long_transcript$ranges.width.cds), log10(cds_long_transcript$ranges.width.mrna), xlab="CDS length", ylab="Transcript length", main="CDS length vs transcript length in transcripts with long introns in log scale")
+
+comparisonplot(cds_long_transcript$ranges.width.cds, cds_long_transcript$ranges.width.mrna, log="xy", xlab="CDS length", ylab="Transcript length", main="CDS length vs transcript length in transcripts with long introns in log scale")
+
+
+
+comparisonplot(cds_short_transcript$ranges.width.cds, cds_short_transcript$ranges.width.mrna, xlab="CDS length", ylab="Transcript length", main="Comparisonplot CDS length vs transcript length in transcripts with short introns", xlim=c(0,10000))
+
+comparisonplot(log10(cds_short_transcript$ranges.width.cds), log10(cds_short_transcript$ranges.width.mrna), xlab="CDS length", ylab="Transcript length", main="CDS length vs transcript length in transcripts with short introns in log scale")
+
+comparisonplot(cds_short_transcript$ranges.width.cds, cds_short_transcript$ranges.width.mrna, log="xy", xlab="CDS length", ylab="Transcript length", main="CDS length vs transcript length in transcripts with short introns in log scale")
+
+```
+
+```{r}
+#compare the length of CDS with the number of exons present in a CDS (use findOverlap?????????????????????????????????)
+gff3_exon$counts <- 1
+df_exons <- data.frame(seqnames=seqnames(gff3_exon), ranges= ranges(gff3_exon),strand= strand(gff3_exon),type=gff3_exon$type,
+                         ID=gff3_exon$ID, Parent=gff3_exon$Parent, counts=gff3_exon$counts)
+
+
+
+
+```
+
+
+```{r}
+#Look where the long introns are located (CDS or UTRs) so plot #exons in the mRNA vs CDS length
+
+
+df_exons_grouped <- df_exons %>% group_by(Parent.value)
+
+df_exons_summarize <- df_exons_grouped %>% summarise(ranges.width=sum(ranges.width), counts=sum(counts))
+
+cds_exons_summarize <- df_cds_summarize %>% left_join(df_exons_summarize, by="Parent.value", suffix=c(".cds",".exon"))
+
+ggplot(cds_exons_summarize, aes(counts.exon, width))+
+  geom_point()+
+  labs(title="Scatterplot of the number of exons in a transcript vs CDS length", x="# exons", y="CDS length")
+
+comparisonplot(cds_exons_summarize$counts.exon, cds_exons_summarize$width, xlim=c(0,80))
+comparisonplot(log10(cds_exons_summarize$counts.exon), log10(cds_exons_summarize$width), main = "Comparisonplot of the number of exons in a transcript vs CDS length", xlab="# exons", ylab = "CDS length")
+
+
+head(cds_exons_summarize %>% arrange(desc(counts.exon)))
+
+
+cds_exons_long_transcript <- cds_exons_summarize[which(cds_exons_summarize$Parent.value %in% long_introns_id),]
+cds_exons_short_transcript <- cds_exons_summarize[which(cds_exons_summarize$Parent.value %in% short_introns_id),]
+
+head(cds_exons_long_transcript %>% arrange(desc(counts.exon)))
+head(cds_exons_short_transcript %>% arrange(desc(counts.exon)))
+
+ggplot(cds_exons_long_transcript, aes(counts.exon, width))+
+  geom_point(alpha=0.5)+
+  geom_smooth(method="glm")+
+  labs(title="Scatterplot of the number of exons in a transcript vs CDS length\nin transcripts with long introns", x="# exons", y="CDS length")
+
+ggplot(cds_exons_long_transcript, aes(counts.exon, width))+
+  geom_hex(bins=50)+
+  geom_smooth(method="glm")+
+  labs(title="Scatterplot of the number of exons in a transcript vs CDS length\nin transcripts with long introns", x="# exons", y="CDS length")
+
+ggplot(cds_exons_long_transcript, aes(counts.exon, width))+
+  geom_point(alpha=0.5)+
+  geom_smooth(method="gam")+
+  labs(title="Scatterplot of the number of exons in a transcript vs CDS length\nin transcripts with long introns", x="# exons", y="CDS length")
+
+
+comparisonplot(log10(cds_exons_long_transcript$counts.exon), log10(cds_exons_long_transcript$width), main = "Number of exons in a transcript vs CDS length in transcripts with long introns", xlab="# exons", ylab = "CDS length")
+
+comparisonplot(cds_exons_long_transcript$counts.exon, cds_exons_long_transcript$width, log="xy", main = "Number of exons in a transcript vs CDS length in transcripts with long introns", xlab="# exons", ylab = "CDS length")
+
+ggplot(cds_exons_short_transcript, aes(counts.exon, width))+
+  geom_point(alpha=0.5)+
+  geom_smooth(method="glm")+
+  labs(title="Scatterplot of the number of exons in a transcript vs CDS length\nin transcripts with short introns", x="# exons", y="CDS length")
+
+ggplot(cds_exons_short_transcript, aes(counts.exon, width))+
+  geom_point(alpha=0.5)+
+  geom_smooth(method="gam")+
+  labs(title="Scatterplot of the number of exons in a transcript vs CDS length\nin transcripts with short introns", x="# exons", y="CDS length")
+
+
+comparisonplot(log10(cds_exons_short_transcript$counts.exon), log10(cds_exons_short_transcript$width), main = "Number of exons in a transcript vs CDS length in transcripts with short introns", xlab="# exons", ylab = "CDS length")
+
+comparisonplot(cds_exons_short_transcript$counts.exon, cds_exons_short_transcript$width, log="xy", main = "Number of exons in a transcript vs CDS length in transcripts with short introns", xlab="# exons", ylab = "CDS length")
+
+
+#calculate ratio # of CDS introns/# of introns for long and short mRNA????????????????????????????????????????
+
+df_cds[which(df_cds$Parent.value=="PICABM00001871025"),]
+df_exons[which(df_exons$Parent.value=="PICABM00001871025"),]
+
+
+```
+
+
+```{r, # CDS/# exons}
+#Plot the number of exons classed as CDS against the total number of exons
+
+#whole dataset
+ggplot(cds_exons_summarize, aes(counts.cds/counts.exon))+
+  geom_histogram(bins=25, fill="light blue", color="grey")+
+  labs(x="# CDS/# exons", title ="Histogram of the ratio number of CDS/number of exons")
+
+#transcripts with long introns
+ggplot(cds_exons_long_transcript, aes(counts.cds/counts.exon))+
+  geom_histogram(bins=25, fill="light blue", color="grey")+
+  labs(x="# CDS/# exons", title ="Histogram of the ratio number of CDS/number of exons\nin transcripts with long introns")
+
+#transcripts with short introns
+ggplot(cds_exons_short_transcript, aes(counts.cds/counts.exon))+
+  geom_histogram(bins=25, fill="light blue", color="grey")+
+  labs(x="# CDS/# exons", title ="Histogram of the ratio number of CDS/number of exons\nin transcripts with short introns")
+
+```
+
+
+```{r}
 ```
 
 
