@@ -1,5 +1,8 @@
+#!/bin/bash
 #Script to submit salmon to the job queue
 
+#To be safe
+set -eux
 #to make the file executable:  chmod +x squeueSalmon.sh 
 #inside ~/Git/Master-thesis-project/pipeline call the file since its executable: ./squeueSalmon.sh
 #we have to specify singularity bindpath -> set the environment variable 
@@ -9,13 +12,14 @@ proj=u2019016
 mail=emanuela.damieto@studenti.unitn.it
 
 #real path to make the code more reproducible
-INDIR=$(realpath /mnt/picea/storage/reference/Picea-abies/v2.0/indices/salmon)     #index directory
+INDIR=$(realpath ../reference/indices/salmon/Picea-abies-mRNA-temp-merge_without-decoy_salmon-version-1-dot-9-dot0)     #index directory
 #fq files directory
-FQDIR=$(realpath /mnt/picea/projects/spruce/vhurry/drought-stress-roots/preprosessed/trimmomatic)
+FQDIR=$(realpath ../data/trimmomatic)
 #output directory 
-OUTDIR=$(realpath ../data/SalmonResults)
+OUTDIR=$(realpath ../results/Salmon)
 #take singularity container file from kogia because there are more recent versions of files
 SING_SALMON=$(realpath ../singularity/kogia/salmon_1.9.0.sif)
+
 
 #[[condition]] substitute if condition fi
 #! = doesn't exist
@@ -24,11 +28,12 @@ SING_SALMON=$(realpath ../singularity/kogia/salmon_1.9.0.sif)
 [[ ! -d $OUTDIR ]] && mkdir -p $OUTDIR
 
 #-A project, -J job name, -o output file, -e error file, --mail.user to specify the mail
-i=1
 for f in $(find $FQDIR -name "*trimmomatic_1.fq.gz"); do 
-    sbatch -A $proj -J salmon_i -o $OUTDIR_$(basename ${f/trimmomatic_1.fq.gz}).out -e $OUTDIR_$(basename ${f/trimmomatic_1.fq.gz}).err \
-    --mail-user $mail runSalmon.sh $SING_SALMON $INDIR $f ${f/trimmomatic_1.fq.gz/trimmomatic_2.fq.gz} $OUTDIR/$(basename ${f/trimmomatic_1.fq.gz})
-    i++
+    #define a variable with the name of the file
+    fnam=$(basename ${f/_sortmerna_trimmomatic_1.fq.gz})
+    mkdir -p $OUTDIR/$fnam
+    sbatch -A $proj -J salmon-${fnam} -o ${OUTDIR}/$fnam.out -e ${OUTDIR}/$fnam.err \
+    --mail-user $mail runSalmon.sh $SING_SALMON $INDIR $f ${f/trimmomatic_1.fq.gz/trimmomatic_2.fq.gz} $OUTDIR/$fnam
 done 
 
 
