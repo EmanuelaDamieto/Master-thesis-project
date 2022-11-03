@@ -55,7 +55,6 @@ hpal <- colorRampPalette(c("blue","white","red"))(100)
 samples <- read_csv(here("data/drought_roots.csv"),
                       col_types=cols(.default=col_factor()))
 
-samples <- samples[1:28,]
 #' * tx2gene translation table
 #' ```{r Instructions2,eval=FALSE,echo=FALSE}
 #' # This file is necessary if your species has more than one transcript per gene.
@@ -247,8 +246,8 @@ abline(h=1, col = "Red", lty = 3)
 #' This plot is to see whether there is a dependency of SD on the mean. 
 #' 
 #' Before:  
-sd_mean <- meanSdPlot(log1p(counts(dds))[rowSums(counts(dds))>0,])
 
+meanSdPlot(log1p(counts(dds))[rowSums(counts(dds))>0,])$gg + ggtitle("Mean counts vs SD before VST normalization")
 
 #' After VST normalization, the red line should be almost horizontal which indicates
 #' no dependency of variance on mean (homoscedastic).
@@ -258,12 +257,8 @@ vsd <- varianceStabilizingTransformation(dds, blind=TRUE)
 vst <- assay(vsd)
 vst <- vst - min(vst)
 
-sd_mean_vst <- meanSdPlot(vst[rowSums(vst)>0,])
+meanSdPlot(vst[rowSums(vst)>0,])$gg +  ggtitle("Mean counts vs SD after VST normalization")
 
-#' ```{r plot with title, echo=FALSE,eval=FALSE}
-#' # sd_mean$gg + ggtitle("Mean counts vs SD before VST normalization")
-#' # sd_mean_vst$gg + ggtitle("Mean counts vs SD after VST normalization")
-#' ```
 
 #' `r emoji("point_right")` **We can conclude that the variance stabilization worked adequately even if the red line is not perfectly horizontal**
 #' 
@@ -344,7 +339,7 @@ hm <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
 
 plot(as.hclust(hm$colDendrogram),xlab="",sub="", cex.axis=2)
 
-#' Set the cut off to 6 in order to retrieve less than 10 000 genes
+#' * Set the cut off to 6 in order to retrieve less than 10 000 genes
 vst.cutoff <- 6
 
 hm_reduced <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
@@ -383,18 +378,18 @@ pvrect(hm.pvclust)
 samples_rep$Filenames <- filelist
 samples_rep$BioID <- sub("[1-3]_151118_BC852HANXX_", "", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
 #' # Merging technical replicates
-#' txi$counts <- sapply(split.data.frame(t(txi$counts),samples_rep$BioID),colSums)
-#' txi$length <- sapply(split.data.frame(t(txi$length),samples_rep$BioID),colMaxs)
+#' # txi$counts <- sapply(split.data.frame(t(txi$counts),samples_rep$BioID),colSums)
+#' # txi$length <- sapply(split.data.frame(t(txi$length),samples_rep$BioID),colMaxs)
 #' # Counts are now in alphabetic order, check and reorder if necessary
-#' stopifnot(colnames(txi$counts) == samples_rep$BioID)
-#' samples_rep <- samples_rep[match(colnames(txi$counts),samples_rep$BioID),]
+#' # stopifnot(colnames(txi$counts) == samples_rep$BioID)
+#' # samples_rep <- samples_rep[match(colnames(txi$counts),samples_rep$BioID),]
 #' # Recreate the dds
-#' dds <- DESeqDataSetFromTximport(
-#'   txi=txi,
-#'   colData = samples_rep,
-#'   design = ~ Level)
+#' #dds <- DESeqDataSetFromTximport(
+#' #   txi=txi,
+#' #   colData = samples_rep,
+#' #   design = ~ Level)
 
-#' save(dds,file=here("data/analysis/salmon/dds_merge.rda"))
+#' #save(dds,file=here("data/analysis/salmon/dds_merge.rda"))
 #' ```
 #' 
 
