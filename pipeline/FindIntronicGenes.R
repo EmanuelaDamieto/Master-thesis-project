@@ -549,7 +549,7 @@ findOverlaps(gr, gr1, select="last")
 
 findOverlaps(gr1, gr)
 findOverlaps(gr1, gr, type="start")
-findOverlaps(gr1, gr, type="within")
+countOverlaps(gr1, gr, type="within")
 findOverlaps(gr1, gr, type="equal")
 
 ## ---------------------------------------------------------------------
