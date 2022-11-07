@@ -312,8 +312,8 @@ ggplotly(p) %>%
 #' 
 #' ## Sequencing depth
 #' Number of genes expressed per condition at different cutoffs:
-#conds <- factor(paste(dds$Level,dds$Filenames))
-conds <- factor(dds$Level)
+#conds <- factor(dds$Level)
+conds <- factor(paste(dds$Level, dds$Filenames))
 dev.null <- rangeSamplesSummary(counts=vst,
                                 conditions=conds,
                                 nrep=3)
@@ -361,6 +361,7 @@ hm.pvclust <- pvclust(data = t(scale(t(vst[sels[[vst.cutoff+1]],]))),
                        nboot = 1000, parallel = TRUE)
 
 #' Plot the clustering with bp and au
+
 plot(hm.pvclust, labels = conds, cex.axis=1.5)
 pvrect(hm.pvclust)
 
