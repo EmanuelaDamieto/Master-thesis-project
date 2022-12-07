@@ -388,10 +388,7 @@ repeats_short_type <- unique(repeats_short$attributes_repeats) #2991
 length(intersect(repeats_long_type, repeats_short_type)) #2828
 
 
-
 #convert mrna id into gene id 
-
-
 #check repeats in c2d/80 expressed genes?????????
 
 ```
@@ -400,6 +397,17 @@ length(intersect(repeats_long_type, repeats_short_type)) #2828
 #Analysis of DEG -> enrichment of DEG with long/short introns in C2d and 80 (as background consider all genes that pass the test not all genes in the genome) ???
 deg <- read.csv(here("data/analysis/DE/DE-C2dvs80-genes.csv"))
 deg <- deg %>% rename(Gene = X)
-deg_long <- deg %>% filter()
+
+#up,down regulated genes
+deg_up <- deg %>% filter(log2FoldChange>0)
+deg_down <- 
+
+deg_long <- deg %>% filter(Gene %in% tx2gene_long$GENE)
+deg_short <- deg %>% filter(Gene %in% tx2gene_short$GENE)
+
+
+
 ```
+
+
 

@@ -66,7 +66,7 @@ samples <- read_csv(here("data/drought_roots.csv"),
 #' # comment the next line
 #' ```
 
-tx2gene <- suppressMessages(read_delim(here("reference/annotation/tx2gene.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+tx2gene <- suppressMessages(read_delim(here("reference/annotation/tx2gene_update.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
 
 #' * Raw data
 filelist <- list.files(here("results/Salmon"), 
@@ -98,10 +98,13 @@ write_tsv(samples_rep,here("data/samples_full_rank.txt"))
 #' in transcript level replace with the following:
 #' txi <- suppressMessages(tximport(files = samples$Filenames, type = "salmon",txOut=TRUE))
 #' ```
-
+# txi <- suppressMessages(tximport(files = samples_rep$Filenames,
+#                                  type = "salmon",
+#                                  tx2gene=tx2gene))
 txi <- suppressMessages(tximport(files = samples_rep$Filenames,
                                  type = "salmon",
-                                 tx2gene=tx2gene))
+                                 tx2gene=tx2gene,
+                                 countsFromAbundance="lengthScaledTPM"))
 counts <- txi$counts
 colnames(counts) <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
 samples_rep$Filenames <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
@@ -137,7 +140,7 @@ ggplot(dat,aes(x,y,fill=Level)) +
 #' # facet_grid divides the plot into subplots facet into columns, based on discrete variables 
 #' ```
 
-#' `r emoji("point_right")` **We observe difference in the raw sequencing depth**
+#' `r emoji("point_right")` **We observe some variation in the raw sequencing depth between conditions**
 #' 
 
 #' ## Per-gene mean expression
@@ -156,7 +159,7 @@ ggplot(data.frame(value=log10(rowMeans(counts))),aes(x=value)) +
 #' # Ideally gene mean raw counts around 100 -> log10 100 = 2
 #' ```
 #' 
-#' `r emoji("point_right")` **The cumulative gene coverage is as expected since the highest peak is around 2**
+#' `r emoji("point_right")` **The gene mean raw counts distribution is as expected since the highest peak is around 2**
 
 #' ```{r Per sample expression,eval=FALSE,echo=FALSE}
 #' # In the following, the second mutate also needs changing, I kept it 
@@ -180,7 +183,7 @@ ggplot(dat,aes(x=values,group=ind,col=Level)) +
   scale_x_continuous(name="per gene raw counts (log10)") + 
   theme_bw()
 
-#' `r emoji("point_right")` **All samples have the same sequencing depth characteristics and there is no deviation when we look at one or the other variable**
+#' `r emoji("point_right")` **All samples have the same sequencing depth characteristics and there is no deviation when we look at one or the other condition**
 #' 
 #' * Export raw expression data
 dir.create(here("data/analysis/salmon"),showWarnings=FALSE,recursive=TRUE)
@@ -219,8 +222,15 @@ boxplot(normalizationFactors(dds),
         las=2,log="y")
 abline(h=1, col = "Red", lty = 3)
 
+
+
+boxplot(normalizationFactors(dds), xlim=c(1,84), ylim=c(0.001,20),
+        main="Sequencing libraries size factor",
+        las=2,log="y")
+abline(h=1, col = "Red", lty = 3)
+
 #' and without outliers:
-boxplot(normalizationFactors(dds),
+boxplot(normalizationFactors(dds), xlim=c(1,84), ylim=c(0.0,1.5),
         main="Sequencing libraries size factor",
         las=2,log="y", outline=FALSE)
 abline(h=1, col = "Red", lty = 3)
@@ -246,7 +256,6 @@ abline(h=1, col = "Red", lty = 3)
 #' This plot is to see whether there is a dependency of SD on the mean. 
 #' 
 #' Before:  
-
 meanSdPlot(log1p(counts(dds))[rowSums(counts(dds))>0,])$gg + ggtitle("Mean counts vs SD before VST normalization")
 
 #' After VST normalization, the red line should be almost horizontal which indicates
@@ -286,6 +295,8 @@ percent <- round(summary(pc)$importance[2,]*100)
 #' * the red line represents number of variables in the model  
 #' * the orange line represents number of variable combinations.
 #' 
+nvar=1
+nlevel=nlevels(dds$Level)
 ggplot(tibble(x=1:length(percent),y=cumsum(percent)),aes(x=x,y=y)) +
   geom_line() + scale_y_continuous("variance explained (%)",limits=c(0,100)) +
   scale_x_continuous("Principal component") + 
@@ -312,8 +323,8 @@ ggplotly(p) %>%
 #' 
 #' ## Sequencing depth
 #' Number of genes expressed per condition at different cutoffs:
-#conds <- factor(dds$Level)
-conds <- factor(paste(dds$Level, dds$Filenames))
+conds <- factor(dds$Level)
+#' #conds <- factor(paste(dds$Level, dds$Filenames))
 dev.null <- rangeSamplesSummary(counts=vst,
                                 conditions=conds,
                                 nrep=3)
@@ -328,16 +339,18 @@ sels <- rangeFeatureSelect(counts=vst,
 vst.cutoff <- 2
 abline(h=10000, col="Red", lty=3)
 
+#' ```{r heatmap,eval=FALSE,echo=FALSE}
 #' * Heatmap of "all" genes
 #' 
-hm <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
-          distfun=pearson.dist,
-          hclustfun=function(X){hclust(X,method="ward.D2")},
-          labRow = NA,trace = "none",
-          labCol = conds,
-          col=hpal)
-
-plot(as.hclust(hm$colDendrogram),xlab="",sub="", cex.axis=2)
+#' hm <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
+#'           distfun=pearson.dist,
+#'           hclustfun=function(X){hclust(X,method="ward.D2")},
+#'           labRow = NA,trace = "none",
+#'           labCol = conds,
+#'           col=hpal)
+#' 
+#' plot(as.hclust(hm$colDendrogram),xlab="",sub="", cex.axis=2)
+#' ```
 
 #' * Set the cut off to 6 in order to retrieve less than 10 000 genes
 vst.cutoff <- 6
@@ -349,6 +362,19 @@ hm_reduced <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
                 labCol = conds,
                 col=hpal)
 
+plot(as.hclust(hm_reduced$colDendrogram),xlab="",sub="", cex.axis=2)
+
+#' * Using pheatmap 
+mat <- t(scale(t(vst[sels[[vst.cutoff+1]],])))
+hm <- pheatmap(mat,
+               color = hpal,
+               border_color = NA,
+               clustering_distance_rows = "correlation",
+               clustering_method = "ward.D2",
+               show_rownames = F,
+               labels_col = conds,
+               angle_col = 90,
+               legend = F)
 plot(as.hclust(hm_reduced$colDendrogram),xlab="",sub="", cex.axis=2)
 
 #' `r emoji("point_right")` **The different conditions are not so different in gene expression level**
@@ -376,23 +402,27 @@ pvrect(hm.pvclust)
 #' ```{tech rep, echo=FALSE, eval=FALSE}
 #' # The block of code is meant to combine tech reps - as it is facultative it is commented out
 #' # First create a new variable in your sample object called BioID that identifies uniquely technical replicates, so one value for all tech rep of the same bio rep
-samples_rep$Filenames <- filelist
-samples_rep$BioID <- sub("[1-3]_151118_BC852HANXX_", "", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
+#' samples_rep$Filenames <- filelist
+#' samples_rep$BioID <- sub("[1-3]_151118_BC852HANXX_", "", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
 #' # Merging technical replicates
-#' # txi$counts <- sapply(split.data.frame(t(txi$counts),samples_rep$BioID),colSums)
-#' # txi$length <- sapply(split.data.frame(t(txi$length),samples_rep$BioID),colMaxs)
+#' txi$counts <- sapply(split.data.frame(t(txi$counts),samples_rep$BioID),colSums)
+#' txi$length <- sapply(split.data.frame(t(txi$length),samples_rep$BioID),colMaxs)
 #' # Counts are now in alphabetic order, check and reorder if necessary
-#' # stopifnot(colnames(txi$counts) == samples_rep$BioID)
-#' # samples_rep <- samples_rep[match(colnames(txi$counts),samples_rep$BioID),]
+#' stopifnot(colnames(txi$counts) == samples_rep$BioID)
+#' samples_rep <- samples_rep[match(colnames(txi$counts),samples_rep$BioID),]
 #' # Recreate the dds
-#' #dds <- DESeqDataSetFromTximport(
-#' #   txi=txi,
-#' #   colData = samples_rep,
-#' #   design = ~ Level)
-
-#' #save(dds,file=here("data/analysis/salmon/dds_merge.rda"))
+#' dds <- DESeqDataSetFromTximport(
+#'        txi=txi,
+#'        colData = samples_rep,
+#'        design = ~ Level)
+#'
+#' save(dds,file=here("data/analysis/salmon/dds_merge_lengthScaledTPM.rda"))
 #' ```
 #' 
+#' 
+#' 
+#' 
+
 
 #' <hr />
 #' &nbsp;

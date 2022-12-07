@@ -117,7 +117,7 @@ hist(df_introns_in_genes_without_outliers$length, xlim=c(0,700000), main="Histog
 
 ```{r}
 #set the threshold of log intron length to 4
-long_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)>4)
+long_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)>=4)
 short_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)<4)
 long_introns_id <- long_introns$parent
 short_introns_id <- short_introns$parent
@@ -370,7 +370,7 @@ This package is used to find the introns inside each gene.
 #Use genomic ranges package on genes and introns ;)
 #Genomic Ranges works with S4 vectors
 
-mrna_clean <- mrna %>% separate(attributes, c("ID", "Parent", "Name"), ";") %>% mutate (ID= sub("ID=","", ID), Parent= sub("Parent=","",Parent), Name= sub("Name=","",Name)) %>% filter(!Parent %in% strange_mRNA,)
+mrna_clean <- mrna %>% separate(attributes, c("ID", "Parent", "Name"), ";") %>% mutate (ID= sub("ID=","", ID), Parent= sub("Parent=","",Parent), Name= sub("Name=","",Name)) %>% filter(!ID %in% strange_mRNA,)
 
 #specify the columns you want in the granges objects
 library("GenomicRanges")
@@ -572,6 +572,7 @@ head(df_new)
 write.csv(df_new, file="Introns_within_genes.csv")
 
 ```
+
 ```{r}
 attributes <- mcols(ggenes)$attributes
 att <- strsplit(attributes, split=";")
@@ -1120,7 +1121,7 @@ ggplot(cds_mrna_grouped, aes(ranges.width.cds))+
 #Split long transcripts and short transcripts
 ```{r, CDS length in transcript with long and short introns}
 #Split the transcript in two based on intron length. In this way we'll lose the transcript without introns 
-long_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)>4)
+long_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)>=4)
 short_introns <- df_introns_in_genes_without_outliers %>% filter(log10(length)<4)
 long_introns_id <- long_introns$parent
 short_introns_id <- short_introns$parent
@@ -1255,10 +1256,3 @@ ggplot(cds_exons_short_transcript, aes(counts.cds/counts.exon))+
   labs(x="# CDS/# exons", title ="Histogram of the ratio number of CDS/number of exons\nin transcripts with short introns")
 
 ```
-
-
-```{r}
-```
-
-
-```{r}

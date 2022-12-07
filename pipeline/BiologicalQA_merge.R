@@ -66,7 +66,7 @@ samples <- read_csv(here("data/drought_roots.csv"),
 #' # comment the next line
 #' ```
 
-tx2gene <- suppressMessages(read_delim(here("reference/annotation/tx2gene.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+tx2gene <- suppressMessages(read_delim(here("reference/annotation/tx2gene_update.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
 
 #' * Raw data
 filelist <- list.files(here("results/Salmon"), 
@@ -100,9 +100,10 @@ samples_rep$BioID <- sub("[1-3]_151118_BC852HANXX_", "", sub("*_sortmerna_trimmo
 
 txi <- suppressMessages(tximport(files = samples_rep$Filenames,
                                  type = "salmon",
-                                 tx2gene=tx2gene))
+                                 tx2gene=tx2gene,
+                                 countsFromAbundance="lengthScaledTPM"))
 counts <- txi$counts
-#' Combine technical replicates 
+
 counts <- do.call(
   cbind,
   lapply(split.data.frame(t(counts),
@@ -112,6 +113,9 @@ counts <- do.call(
 csamples <- samples[,-1]
 csamples <- csamples[match(colnames(counts),csamples$SciLifeID),]
 colnames(counts) <- csamples$SciLifeID
+
+#' `r emoji("point_right")` **We've generated counts from abundances using the average transcript length, averaged over samples and to library size**
+
 #' 
 #' <hr />
 #' &nbsp;
@@ -143,7 +147,7 @@ ggplot(dat,aes(x,y,fill=Level)) +
 #' # facet_grid divides the plot into subplots facet into columns, based on discrete variables 
 #' ```
 
-#' `r emoji("point_right")` **We observe not a big difference in the raw sequencing depth**
+#' `r emoji("point_right")` **There is not a big difference in the raw sequencing depth**
 #' 
 
 #' ## Per-gene mean expression
@@ -162,7 +166,7 @@ ggplot(data.frame(value=log10(rowMeans(counts))),aes(x=value)) +
 #' # Ideally gene mean raw counts around 100 -> log10 100 = 2
 #' ```
 #' 
-#' `r emoji("point_right")` **The cumulative gene coverage is as expected since the highest peak is around 2 even if there is a lot of noise around 0**
+#' `r emoji("point_right")` **The per-gene mean expression is as expected since the highest peak is around 2**
 
 #' ```{r Per sample expression,eval=FALSE,echo=FALSE}
 #' # In the following, the second mutate also needs changing, I kept it 
@@ -186,7 +190,7 @@ ggplot(dat,aes(x=values,group=ind,col=Level)) +
   scale_x_continuous(name="per gene raw counts (log10)") + 
   theme_bw()
 
-#' `r emoji("point_right")` **All samples have the same sequencing depth characteristics and there is no deviation when we look at one or the other variable**
+#' `r emoji("point_right")` **All samples have the same sequencing depth characteristics and there is no deviation when we look at one or the other condition**
 #' 
 #' * Export raw expression data
 dir.create(here("data/analysis/salmon"),showWarnings=FALSE,recursive=TRUE)
@@ -228,7 +232,7 @@ boxplot(normalizationFactors(dds),
         las=2,log="y", outline=FALSE)
 abline(h=1, col = "Red", lty = 3)
 
-#' `r emoji("point_right")` **The sequencing libraries size factor is highly variable across samples but similar for the technical replicates**
+#' `r emoji("point_right")` **The sequencing libraries size factor is a bit variable across samples**
 #'
 #' ```{r echo=FALSE,eval=FALSE}
 #' # Assess whether there might be a difference in library size linked to a
@@ -326,7 +330,6 @@ ggplotly(p) %>%
 #' 
 #' ## Sequencing depth
 #' Number of genes expressed per condition at different cutoffs:
-#conds <- factor(dds$Level)
 conds <- factor(dds$Level)
 dev.null <- rangeSamplesSummary(counts=vst,
                                 conditions=conds,
@@ -342,16 +345,18 @@ sels <- rangeFeatureSelect(counts=vst,
 vst.cutoff <- 2
 abline(h=10000, col="Red", lty=3)
 
+#' ```{r Heatmap,eval=FALSE,echo=FALSE}
 #' * Heatmap of "all" genes
 #' 
-hm <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
-          distfun=pearson.dist,
-          hclustfun=function(X){hclust(X,method="ward.D2")},
-          labRow = NA,trace = "none",
-          labCol = conds,
-          col=hpal)
-
-plot(as.hclust(hm$colDendrogram),xlab="",sub="")
+#' hm <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
+#'           distfun=pearson.dist,
+#'           hclustfun=function(X){hclust(X,method="ward.D2")},
+#'           labRow = NA,trace = "none",
+#'           labCol = conds,
+#'           col=hpal)
+#' 
+#' plot(as.hclust(hm$colDendrogram),xlab="",sub="")
+#' ```
 
 #' * Set the cut off to 8 in order to retrieve less than 10 000 genes
 vst.cutoff <- 8
@@ -365,7 +370,7 @@ hm_reduced <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
 
 plot(as.hclust(hm_reduced$colDendrogram),xlab="",sub="")
 
-#' `r emoji("point_right")` **The different conditions are not so different in gene expression level**
+#' `r emoji("point_right")` **The different conditions are not so different in gene expression level except the extreme conditions**
 #' 
 
 #' ## Clustering of samples
