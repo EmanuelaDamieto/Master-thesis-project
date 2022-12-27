@@ -12,7 +12,7 @@ proj=u2019016
 mail=emanuela.damieto@studenti.unitn.it
 
 #real path to make the code more reproducible
-# INDIR=$(realpath ../reference/indices/salmon/Picea-abies-mRNA-temp-merge_without-decoy_salmon-version-1-dot-9-dot0)     #index directory
+#index directory
 INDIR=$(realpath ../reference/indices/salmon/Picea-abies-protein-coding_without-decoy_salmon-version-1-dot-9-dot0)
 #fq files directory
 FQDIR=$(realpath ../data/trimmomatic)

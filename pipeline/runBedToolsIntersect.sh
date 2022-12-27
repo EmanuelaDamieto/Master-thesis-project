@@ -37,11 +37,14 @@ dir=$1;
 shift;
 
 # combine the filename for the output
-# outfile=$dir/intersection_repeats_genes.tsv
-outfile=$dir/intersection_repeats_introns.tsv
+# outfile=$dir/intersection_repeats_introns.tsv
+# outfile=$dir/intersection_repeats_introns_ovl.tsv
+outfile=$dir/intersection_repeats_cds_ovl.tsv
 
 ## get the intersect results
 #option: 
 #-f -> specifies the minimal overlap required in percentage
 #-wa -wb -> reporting the original A feature and B feature 
-bedtools intersect $@ -a $a -b $b -f 0.5 -wa -wb> $outfile
+#-wo write the amount of overlap between intersecting features 
+# bedtools intersect $@ -a $a -b $b -f 0.5 -wa -wb> $outfile
+bedtools intersect $@ -a $a -b $b -f 0.5 -wo> $outfile

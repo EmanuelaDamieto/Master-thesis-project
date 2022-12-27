@@ -16,9 +16,8 @@ mail=emanuela.damieto@studenti.unitn.it
 SING_SALMON=$(realpath ../singularity/kogia/salmon_1.9.0.sif)
 #The second argument is the input fasta file 
 # INPUTFILE=$(realpath ../reference/fasta/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa_salmon_redundant_mRNA_removed.gff3.mRNA.fa.gz)
-INPUTFILE=$(realpath ../reference/fasta/agat_renamed_with_pos_short_removed_eggnog_added.gff.gz)
+INPUTFILE=$(realpath ../reference/fasta/Picab02_protein_coding_mRNA.fa.gz)
 #The third argument is an output directory for the indices 
-# OUTDIR=$(realpath ../reference/indices/salmon/Picea-abies-mRNA-temp-merge_without-decoy_salmon-version-1-dot-9-dot0)
 OUTDIR=$(realpath ../reference/indices/salmon/Picea-abies-protein-coding_without-decoy_salmon-version-1-dot-9-dot0)
 
 #[[condition]] substitute if condition fi

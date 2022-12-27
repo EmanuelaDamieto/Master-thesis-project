@@ -18,8 +18,8 @@ module load BEDTools
 INREP=$(realpath ../reference/gff3/pabies-2.0_chromosomes_and_unplaced.fa.repeats.gff)
 
 #Annotation file 
-#INANN=$(realpath ../data/gff3/genes.gff3)
-INANN=$(realpath ../data/gff3/introns.gff3)
+#INANN=$(realpath ../data/gff3/introns.gff3)
+INANN=$(realpath ../data/gff3/cds.gff3)
 
 #Specify output directory
 OUTDIR=$(realpath ../results/BedToolsIntersect)
@@ -29,5 +29,5 @@ OUTDIR=$(realpath ../results/BedToolsIntersect)
 
 #-A project, -J job name, -o output file, -e error file, --mail.user to specify the mail
 sbatch -A $proj -J BedToolsIntersect -o $OUTDIR/BedToolsIntersect_$(basename ${INANN/.gff3}).out \
--e $OUTDIR/BedToolsIntersect_$(basename${INANN/.gff3}).err \
+-e $OUTDIR/BedToolsIntersect_$(basename ${INANN/.gff3}).err \
 --mail-user $mail runBedToolsIntersect.sh $INREP $INANN $OUTDIR
