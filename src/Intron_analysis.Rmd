@@ -38,6 +38,8 @@ introns <- subset(spruce, type=="intron")
 mrna <- subset(spruce, type=="mRNA")
 cds <- subset(spruce, type=="CDS")
 
+table(spruce$type)
+
 # write_gff3(cds,here("data/gff3/cds.gff3"))
 # cds_file <- read.table(gzfile(here("data/gff3/cds.gff3")), sep="\t", quote="")
 # write_gff3(introns,here("data/gff3/introns.gff3"))

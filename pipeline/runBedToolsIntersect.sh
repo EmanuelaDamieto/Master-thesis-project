@@ -37,9 +37,7 @@ dir=$1;
 shift;
 
 # combine the filename for the output
-# outfile=$dir/intersection_repeats_introns.tsv
-# outfile=$dir/intersection_repeats_introns_ovl.tsv
-outfile=$dir/intersection_repeats_cds_ovl.tsv
+outfile=$dir/intersection_repeats_$(basename ${b/.gff3}).tsv
 
 ## get the intersect results
 #option: 
