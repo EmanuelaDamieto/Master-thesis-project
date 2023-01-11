@@ -369,14 +369,14 @@ contrast_Collapse_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Colla
 #' ### Contrast C2d vs 80
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", labels = dds$Level, default_prefix="DE-C2dvs80")
 
+#' Show the heatmap just for the constrast we are interested in (C2d, 80), (11 043 DE)
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80")
 
+#' Change the value of the log2fc to remove bias due to the different amount of gene expression in the two conditions (5759 DE)
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-lfc2", lfc=2)
 
 #' ### Contrast rehydrate vs 80
 contrast_Rehydrate_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Rehydrate_vs_80.", labels = dds$Level, default_prefix="DE-Rehydratevs80")
-
-
 
 
 #' ### Venn Diagram

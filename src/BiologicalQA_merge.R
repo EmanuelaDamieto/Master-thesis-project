@@ -66,7 +66,7 @@ samples <- read_csv(here("data/drought_roots.csv"),
 #' # comment the next line
 #' ```
 
-tx2gene <- suppressMessages(read_delim(here("reference/annotation/tx2gene_update.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+tx2gene <- suppressMessages(read_delim(here("reference/annotation/Picab02_tx2gene.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
 
 #' * Raw data
 filelist <- list.files(here("results/Salmon"), 
@@ -193,7 +193,6 @@ ggplot(dat,aes(x=values,group=ind,col=Level)) +
 #' `r emoji("point_right")` **All samples have the same sequencing depth characteristics and there is no deviation when we look at one or the other condition**
 #' 
 #' * Export raw expression data
-dir.create(here("data/analysis/salmon"),showWarnings=FALSE,recursive=TRUE)
 write.csv(counts,file=here("data/analysis/salmon/raw-unormalised-gene-expression_data_merge.csv"))
 #' 
 #' <hr />
@@ -212,8 +211,8 @@ write.csv(counts,file=here("data/analysis/salmon/raw-unormalised-gene-expression
 #'  # but it does not harm setting it correctly for the differential expression analyses that may follow.
 #'  ```
 #'  
-load(file=here("data/analysis/salmon/dds_merge.rda"))
-
+load(file=here("data/analysis/salmon/dds_merge_lengthScaledTPM.rda"))
+#'load(file=here("data/analysis/salmon/dds_merge.rda"))
 
 #' ## Size factors 
 #' (_i.e._ the sequencing library size effect)
@@ -358,8 +357,8 @@ abline(h=10000, col="Red", lty=3)
 #' plot(as.hclust(hm$colDendrogram),xlab="",sub="")
 #' ```
 
-#' * Set the cut off to 8 in order to retrieve less than 10 000 genes
-vst.cutoff <- 8
+#' * Set the cut off to 7 in order to retrieve less than 10 000 genes
+vst.cutoff <- 7
 
 hm_reduced <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
                 distfun=pearson.dist,

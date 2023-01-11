@@ -30,6 +30,7 @@ suppressPackageStartupMessages({
   library(hyperSpec)
   library(magrittr)
   library(parallel)
+  library(pheatmap)
   library(plotly)
   library(pvclust)
   library(tidyverse)
@@ -66,7 +67,7 @@ samples <- read_csv(here("data/drought_roots.csv"),
 #' # comment the next line
 #' ```
 
-tx2gene <- suppressMessages(read_delim(here("reference/annotation/tx2gene_update.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+tx2gene <- suppressMessages(read_delim(here("reference/annotation/Picab02_tx2gene.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
 
 #' * Raw data
 filelist <- list.files(here("results/Salmon"), 
@@ -106,8 +107,10 @@ txi <- suppressMessages(tximport(files = samples_rep$Filenames,
                                  tx2gene=tx2gene,
                                  countsFromAbundance="lengthScaledTPM"))
 counts <- txi$counts
-colnames(counts) <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
 samples_rep$Filenames <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
+#'colnames(counts) <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
+colnames(counts) <- samples_rep$Filenames
+
 
 #' 
 #' <hr />
@@ -204,25 +207,36 @@ write.csv(counts,file=here("data/analysis/salmon/raw-unormalised-gene-expression
 #'  # It is technically irrelevant here, as we are only doing the quality assessment of the data, 
 #'  # but it does not harm setting it correctly for the differential expression analyses that may follow.
 #'  ```
+
 dds <- DESeqDataSetFromTximport(
   txi=txi,
   colData = samples_rep,
   design = ~ Level)
 
+colnames(dds) <- samples_rep$Filenames
 save(dds,file=here("data/analysis/salmon/dds.rda"))
 
 #' ## Size factors 
 #' (_i.e._ the sequencing library size effect)
 #' 
-dds <- estimateSizeFactors(dds) %>% 
+
+dds <- estimateSizeFactors(dds) %>%   
   suppressMessages()
 
+
+# c <- counts(dds,normalized=TRUE)
+# plotCounts(c)
+# 
+# boxplot(c,
+#         main="Sequencing libraries size factor",
+#         las=2, log="y", ylim = c(0,20))
+
+
+#' NormalizationFactors is NULL, why?!?!?!?
 boxplot(normalizationFactors(dds),
         main="Sequencing libraries size factor",
         las=2,log="y")
 abline(h=1, col = "Red", lty = 3)
-
-
 
 boxplot(normalizationFactors(dds), xlim=c(1,84), ylim=c(0.001,20),
         main="Sequencing libraries size factor",
@@ -325,6 +339,7 @@ ggplotly(p) %>%
 #' Number of genes expressed per condition at different cutoffs:
 conds <- factor(dds$Level)
 #' #conds <- factor(paste(dds$Level, dds$Filenames))
+dev.off()
 dev.null <- rangeSamplesSummary(counts=vst,
                                 conditions=conds,
                                 nrep=3)
@@ -352,8 +367,8 @@ abline(h=10000, col="Red", lty=3)
 #' plot(as.hclust(hm$colDendrogram),xlab="",sub="", cex.axis=2)
 #' ```
 
-#' * Set the cut off to 6 in order to retrieve less than 10 000 genes
-vst.cutoff <- 6
+#' * Set the cut off to 5 in order to retrieve less than 10 000 genes
+vst.cutoff <- 5
 
 hm_reduced <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
                 distfun=pearson.dist,
@@ -419,9 +434,7 @@ pvrect(hm.pvclust)
 #' save(dds,file=here("data/analysis/salmon/dds_merge_lengthScaledTPM.rda"))
 #' ```
 #' 
-#' 
-#' 
-#' 
+
 
 
 #' <hr />

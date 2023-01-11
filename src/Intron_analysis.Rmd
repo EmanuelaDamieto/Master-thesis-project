@@ -67,9 +67,6 @@ long_introns <- df_introns_in_trascr %>% filter(log10(length)>=4)
 short_introns <- df_introns_in_trascr %>% filter(log10(length)<4)
 long_introns_id <- long_introns$parent
 short_introns_id <- short_introns$parent
-
-
-
 ```
 
 ## Data analysis
@@ -294,26 +291,26 @@ head(vst_80_c2d)
 vst_all_mean <- vst_80_c2d %>% transmute(Gene= Gene, "80%" = rowMeans(vst_80_c2d[,2:5]), C2d=rowMeans(vst_80_c2d[,6:8]))
 #43909
 
-#there are 10 274 genes that are not expressed in C2d
+#there are 10 275 genes that are not expressed in C2d
 no_expr_c2d <- filter(vst_all_mean, C2d==0) 
 #6566 of these are not expressed also in the control
 no_expr_both <- filter(vst_all_mean, C2d==0 & `80%`==0)
-#there are 8264 genes that are not expressed in the control 
+#there are 8265 genes that are not expressed in the control 
 no_expr_cnt <- filter(vst_all_mean, `80%`==0) 
 
 
 #make a Euler plot
 #In a Venn diagram every part of the circle is independent!
-#not_expr_C2d=10274-6566=3708, not_expr_CNT=8364-6566=1798
-euler_expr_genes <- euler(c(not_expr_C2D = 3708, not_expr_CNT = 1798, "not_expr_C2D&not_expr_CNT" = 6566))
+#not_expr_C2d=10275-6566=3709, not_expr_CNT=8365-6566=1799
+euler_expr_genes <- euler(c(not_expr_C2D = 3709, not_expr_CNT = 1799, "not_expr_C2D&not_expr_CNT" = 6566))
 plot(euler_expr_genes, quantities=TRUE, labels=list(font=4))
 
 
 #keep the ones that are expressed in C2d 
-not_common_genes <- union(no_expr_c2d, no_expr_cnt) #10274+8264-6566
+not_common_genes <- union(no_expr_c2d, no_expr_cnt) #10275+8265-6566
 expr_common <- vst_all_mean %>% filter(!Gene %in% not_common_genes$Gene)  #43909-(10274+8264-6566)
-common_genes <- expr_common$Gene
-write.table(common_genes, here("data/analysis/common_genes.txt"))
+expr_genes <- expr_common$Gene
+write.table(expr_genes, here("data/analysis/expressed_genes.txt"), row.names=FALSE, col.names=FALSE, quote=FALSE)
 
 
 #keep the information to intersect with genes with long/short introns 
