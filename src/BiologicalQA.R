@@ -67,7 +67,8 @@ samples <- read_csv(here("data/drought_roots.csv"),
 #' # comment the next line
 #' ```
 
-tx2gene <- suppressMessages(read_delim(here("reference/annotation/Picab02_tx2gene.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+tx2gene <- suppressMessages(read_delim(here("reference/annotation/Picab02_tx2gene.tsv.gz"), 
+                                       delim="\t", col_names=c("TXID","GENE"), skip=1))
 
 #' * Raw data
 filelist <- list.files(here("results/Salmon"), 
@@ -104,8 +105,7 @@ write_tsv(samples_rep,here("data/samples_full_rank.txt"))
 #                                  tx2gene=tx2gene))
 txi <- suppressMessages(tximport(files = samples_rep$Filenames,
                                  type = "salmon",
-                                 tx2gene=tx2gene,
-                                 countsFromAbundance="lengthScaledTPM"))
+                                 tx2gene=tx2gene))
 counts <- txi$counts
 samples_rep$Filenames <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
 #'colnames(counts) <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
