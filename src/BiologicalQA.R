@@ -99,16 +99,17 @@ write_tsv(samples_rep,here("data/samples_full_rank.txt"))
 #' If the species has only one transcript per gene, or if you are conducting QA 
 #' in transcript level replace with the following:
 #' txi <- suppressMessages(tximport(files = samples$Filenames, type = "salmon",txOut=TRUE))
-#' ```
-# txi <- suppressMessages(tximport(files = samples_rep$Filenames,
-#                                  type = "salmon",
-#                                  tx2gene=tx2gene))
+#' 
+#' txi <- suppressMessages(tximport(files = samples_rep$Filenames,
+#'                                  type = "salmon",
+#'                                  tx2gene=tx2gene,
+#'                                  countsFromAbundance="lengthScaledTPM"))
+#' ```                                 
 txi <- suppressMessages(tximport(files = samples_rep$Filenames,
                                  type = "salmon",
                                  tx2gene=tx2gene))
 counts <- txi$counts
 samples_rep$Filenames <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
-#'colnames(counts) <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
 colnames(counts) <- samples_rep$Filenames
 
 
@@ -143,7 +144,7 @@ ggplot(dat,aes(x,y,fill=Level)) +
 #' # facet_grid divides the plot into subplots facet into columns, based on discrete variables 
 #' ```
 
-#' `r emoji("point_right")` **We observe some variation in the raw sequencing depth between conditions**
+#' `r emoji("point_right")` **We observe some variation in the raw sequencing depth between conditions but it's not so significant**
 #' 
 
 #' ## Per-gene mean expression
@@ -223,28 +224,15 @@ save(dds,file=here("data/analysis/salmon/dds.rda"))
 dds <- estimateSizeFactors(dds) %>%   
   suppressMessages()
 
-
-# c <- counts(dds,normalized=TRUE)
-# plotCounts(c)
-# 
-# boxplot(c,
-#         main="Sequencing libraries size factor",
-#         las=2, log="y", ylim = c(0,20))
-
-
-#' NormalizationFactors is NULL, why?!?!?!?
+#' boxplot of the sequencing libraries size factor:
 boxplot(normalizationFactors(dds),
         main="Sequencing libraries size factor",
         las=2,log="y")
 abline(h=1, col = "Red", lty = 3)
 
-boxplot(normalizationFactors(dds), xlim=c(1,84), ylim=c(0.001,20),
-        main="Sequencing libraries size factor",
-        las=2,log="y")
-abline(h=1, col = "Red", lty = 3)
 
 #' and without outliers:
-boxplot(normalizationFactors(dds), xlim=c(1,84), ylim=c(0.0,1.5),
+boxplot(normalizationFactors(dds),
         main="Sequencing libraries size factor",
         las=2,log="y", outline=FALSE)
 abline(h=1, col = "Red", lty = 3)
@@ -270,19 +258,25 @@ abline(h=1, col = "Red", lty = 3)
 #' This plot is to see whether there is a dependency of SD on the mean. 
 #' 
 #' Before:  
-meanSdPlot(log1p(counts(dds))[rowSums(counts(dds))>0,])$gg + ggtitle("Mean counts vs SD before VST normalization")
+
+meanSdPlot(log1p(counts(dds))[rowSums(counts(dds))>0,]) 
 
 #' After VST normalization, the red line should be almost horizontal which indicates
 #' no dependency of variance on mean (homoscedastic).
 #' 
-#' ## Variance Stabilising Transformation
+#' ## Variance Stabilizing Transformation
 vsd <- varianceStabilizingTransformation(dds, blind=TRUE)
 vst <- assay(vsd)
 vst <- vst - min(vst)
 
-meanSdPlot(vst[rowSums(vst)>0,])$gg +  ggtitle("Mean counts vs SD after VST normalization")
+#' After: 
+meanSdPlot(vst[rowSums(vst)>0,]) 
 
-
+#' ```{r nice Sd plots, echo=FALSE,eval=FALSE}
+#' meanSdPlot(log1p(counts(dds))[rowSums(counts(dds))>0,])$gg + ggtitle("Mean counts vs SD before VST normalization")
+#' meanSdPlot(vst[rowSums(vst)>0,])$gg + ggtitle("Mean counts vs SD after VST normalization")
+#' ```
+#' 
 #' `r emoji("point_right")` **We can conclude that the variance stabilization worked adequately even if the red line is not perfectly horizontal**
 #' 
 #' <hr />
@@ -296,8 +290,6 @@ percent <- round(summary(pc)$importance[2,]*100)
 #' ### Scree plot
 #' 
 #' We define the number of variables of the model (=1) `r nvar=1`
-
-
 #' and the number of possible combinations (=8). 
 #' ```{r PCA,eval=FALSE,echo=FALSE}
 #' This needs to be adapted to your study design. Add or drop variables aas needed.
@@ -338,8 +330,11 @@ ggplotly(p) %>%
 #' ## Sequencing depth
 #' Number of genes expressed per condition at different cutoffs:
 conds <- factor(dds$Level)
-#' #conds <- factor(paste(dds$Level, dds$Filenames))
-dev.off()
+#' ```{r conds not used ,eval=FALSE,echo=FALSE}
+#' conds <- factor(paste(dds$Level, dds$Filenames))
+#' dev.off()
+#' ```
+
 dev.null <- rangeSamplesSummary(counts=vst,
                                 conditions=conds,
                                 nrep=3)
@@ -414,6 +409,9 @@ pvrect(hm.pvclust)
 #' ```
 #' </details>
 #' 
+
+#' # Combine technical replicates 
+#' 
 #' ```{tech rep, echo=FALSE, eval=FALSE}
 #' # The block of code is meant to combine tech reps - as it is facultative it is commented out
 #' # First create a new variable in your sample object called BioID that identifies uniquely technical replicates, so one value for all tech rep of the same bio rep
@@ -431,11 +429,25 @@ pvrect(hm.pvclust)
 #'        colData = samples_rep,
 #'        design = ~ Level)
 #'
-#' save(dds,file=here("data/analysis/salmon/dds_merge_lengthScaledTPM.rda"))
+#' save(dds,file=here("data/analysis/salmon/dds_merge.rda"))
 #' ```
 #' 
 
+samples_rep$Filenames <- filelist
+samples_rep$BioID <- sub("[1-3]_151118_BC852HANXX_", "", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
+#' Merging technical replicates
+txi$counts <- sapply(split.data.frame(t(txi$counts),samples_rep$BioID),colSums)
+txi$length <- sapply(split.data.frame(t(txi$length),samples_rep$BioID),colMaxs)
+#' Counts are now in alphabetic order, check and reorder if necessary
+stopifnot(colnames(txi$counts) == samples_rep$BioID)
+samples_rep <- samples_rep[match(colnames(txi$counts),samples_rep$BioID),]
+#' Recreate the dds
+dds <- DESeqDataSetFromTximport(
+        txi=txi,
+        colData = samples_rep,
+        design = ~ Level)
 
+save(dds,file=here("data/analysis/salmon/dds_merge.rda"))
 
 #' <hr />
 #' &nbsp;
@@ -443,6 +455,31 @@ pvrect(hm.pvclust)
 #' # Summary
 #' `r emoji("star")` **The data are quite good so we can continue with our analysis**
 #' 
+#' 
+#' 
+
+#' # Create the dds with counts normalized by the transcript length
+#' ```{r Normalized counts,eval=FALSE,echo=FALSE}
+#' It will needed for some of the downstream analysis. 
+#' Here, we are generating counts from abundances, using the argument countsFromAbundance, 
+#' scaled to library size and the average transcript length, averaged over samples. 
+#' In this way we cannot compared different genes but just different transcripts of the same gene. 
+#'
+#' ```
+txi <- suppressMessages(tximport(files = samples_rep$Filenames,
+                                 type = "salmon",
+                                 tx2gene=tx2gene,
+                                 countsFromAbundance="lengthScaledTPM"))
+counts <- txi$counts
+samples_rep$Filenames <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
+colnames(counts) <- samples_rep$Filenames
+dds <- DESeqDataSetFromTximport(
+  txi=txi,
+  colData = samples_rep,
+  design = ~ Level)
+
+colnames(dds) <- samples_rep$Filenames
+save(dds,file=here("data/analysis/salmon/dds_lengthScaledTPM.rda"))
 
 #' # Session Info
 #' <details><summary>Session Info</summary>

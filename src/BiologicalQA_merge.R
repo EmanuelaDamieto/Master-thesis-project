@@ -30,6 +30,7 @@ suppressPackageStartupMessages({
   library(hyperSpec)
   library(magrittr)
   library(parallel)
+  library(pheatmap)
   library(plotly)
   library(pvclust)
   library(tidyverse)
@@ -100,8 +101,7 @@ samples_rep$BioID <- sub("[1-3]_151118_BC852HANXX_", "", sub("*_sortmerna_trimmo
 
 txi <- suppressMessages(tximport(files = samples_rep$Filenames,
                                  type = "salmon",
-                                 tx2gene=tx2gene,
-                                 countsFromAbundance="lengthScaledTPM"))
+                                 tx2gene=tx2gene))
 counts <- txi$counts
 
 counts <- do.call(
@@ -113,8 +113,6 @@ counts <- do.call(
 csamples <- samples[,-1]
 csamples <- csamples[match(colnames(counts),csamples$SciLifeID),]
 colnames(counts) <- csamples$SciLifeID
-
-#' `r emoji("point_right")` **We've generated counts from abundances using the average transcript length, averaged over samples and to library size**
 
 #' 
 #' <hr />
@@ -211,8 +209,8 @@ write.csv(counts,file=here("data/analysis/salmon/raw-unormalised-gene-expression
 #'  # but it does not harm setting it correctly for the differential expression analyses that may follow.
 #'  ```
 #'  
-load(file=here("data/analysis/salmon/dds_merge_lengthScaledTPM.rda"))
-#'load(file=here("data/analysis/salmon/dds_merge.rda"))
+
+load(file=here("data/analysis/salmon/dds_merge.rda"))
 
 #' ## Size factors 
 #' (_i.e._ the sequencing library size effect)
@@ -220,6 +218,7 @@ load(file=here("data/analysis/salmon/dds_merge_lengthScaledTPM.rda"))
 dds <- estimateSizeFactors(dds) %>% 
   suppressMessages()
 
+#' boxplot of the sequencing libraries size factor:
 boxplot(normalizationFactors(dds),
         main="Sequencing libraries size factor",
         las=2,log="y")
@@ -260,7 +259,7 @@ meanSdPlot(log1p(counts(dds))[rowSums(counts(dds))>0,])
 #' After VST normalization, the red line should be almost horizontal which indicates
 #' no dependency of variance on mean (homoscedastic).
 #' 
-#' ## Variance Stabilising Transformation
+#' ## Variance Stabilizing Transformation
 vsd <- varianceStabilizingTransformation(dds, blind=TRUE)
 vst <- assay(vsd)
 vst <- vst - min(vst)
@@ -357,8 +356,8 @@ abline(h=10000, col="Red", lty=3)
 #' plot(as.hclust(hm$colDendrogram),xlab="",sub="")
 #' ```
 
-#' * Set the cut off to 7 in order to retrieve less than 10 000 genes
-vst.cutoff <- 7
+#' * Set the cut off to 6 in order to retrieve less than 10 000 genes
+vst.cutoff <- 6
 
 hm_reduced <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
                 distfun=pearson.dist,
@@ -368,6 +367,19 @@ hm_reduced <- heatmap.2(t(scale(t(vst[sels[[vst.cutoff+1]],]))),
                 col=hpal)
 
 plot(as.hclust(hm_reduced$colDendrogram),xlab="",sub="")
+
+#' * Using pheatmap 
+mat <- t(scale(t(vst[sels[[vst.cutoff+1]],])))
+hm <- pheatmap(mat,
+               color = hpal,
+               border_color = NA,
+               clustering_distance_rows = "correlation",
+               clustering_method = "ward.D2",
+               show_rownames = F,
+               labels_col = conds,
+               angle_col = 90,
+               legend = F)
+plot(as.hclust(hm_reduced$colDendrogram),xlab="",sub="", cex.axis=2)
 
 #' `r emoji("point_right")` **The different conditions are not so different in gene expression level except the extreme conditions**
 #' 
