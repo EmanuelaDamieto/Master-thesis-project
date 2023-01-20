@@ -278,10 +278,9 @@ extractEnrichmentResults <- function(enrichment,task="go",
 #' that contains a DESeqDataSet object. If you ran the 
 #' biological QA template, you need not change anything
 #' 
-#' #' load(here("data/analysis/salmon/dds_merge.rda"))
 #' ```
 
-load(here("data/analysis/salmon/dds_merge_lengthScaledTPM.rda"))
+load(here("data/analysis/salmon/dds_merge.rda"))
 
 #' ## Normalisation for visualisation
 #' ```{r normalisation, echo=FALSE,eval=FALSE, message=FALSE}
@@ -293,9 +292,9 @@ vsd <- varianceStabilizingTransformation(dds,blind=FALSE)
 vst <- assay(vsd)
 vst <- vst - min(vst)
 dir.create(here("data/analysis/DE"),showWarnings=FALSE)
-save(vst,file=here("data/analysis/DE/vst-aware_lengthScaledTPM.rda"))
+save(vst,file=here("data/analysis/DE/vst-aware.rda"))
 write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
-            here("data/analysis/DE/vst-aware_lengthScaledTPM.tsv"))
+            here("data/analysis/DE/vst-aware.tsv"))
 
 
 #' ## Gene of interests
@@ -318,11 +317,10 @@ write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
 dds <- DESeq(dds)
 
 
-
 #' * Dispersion estimation
 plotDispEsts(dds)
 
-#' Check the different contrasts
+#' * Check the different contrasts
 resultsNames(dds)
 
 #' ## Results
@@ -346,37 +344,39 @@ resultsNames(dds)
 #' 
 #' ```
 
-#' ```{r contrast, echo=TRUE,eval=FALSE}
+#' ```{r contrast, echo=FALSE,eval=FALSE}
 #' Evaluate the different contrasts. The 80% water content in the soil is our control.
 #' ```
 
-
+#' ```{r different contrasts, echo=TRUE,eval=FALSE}
 #' ### Contrast 60 vs 80
-contrast_60_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_60._vs_80.", labels = dds$Level, default_prefix="DE-60vs80")
-
+#' contrast_60_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_60._vs_80.", labels = dds$Level, default_prefix="DE-60vs80")
+#' 
 #' ### Contrast 40 vs 80
-contrast_40_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_40._vs_80.", labels = dds$Level, default_prefix="DE-40vs80")
+#' contrast_40_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_40._vs_80.", labels = dds$Level, default_prefix="DE-40vs80")
 
 #' ### Contrast 30 vs 80
-contrast_30_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30._vs_80.", labels = dds$Level, default_prefix="DE-30vs80")
+#' contrast_30_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30._vs_80.", labels = dds$Level, default_prefix="DE-30vs80")
 
 #' ### Contrast 307d vs 80
-contrast_307d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30.7d_vs_80.", labels = dds$Level, default_prefix="DE-307dvs80")
+#' contrast_307d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30.7d_vs_80.", labels = dds$Level, default_prefix="DE-307dvs80")
 
 #' ### Contrast collapse vs 80
-contrast_Collapse_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Collapse_vs_80.", labels = dds$Level, default_prefix="DE-collapsevs80")
+#' contrast_Collapse_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Collapse_vs_80.", labels = dds$Level, default_prefix="DE-collapsevs80")
+
+#' ### Contrast rehydrate vs 80
+#' contrast_Rehydrate_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Rehydrate_vs_80.", labels = dds$Level, default_prefix="DE-Rehydratevs80")
+
+#' ```
 
 #' ### Contrast C2d vs 80
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' Show the heatmap just for the constrast we are interested in (C2d, 80), (11 043 DE)
+#' #### Show the heatmap just for the contrast we are interested in (C2d, 80), (11 059 DE)
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' Change the value of the log2fc to remove bias due to the different amount of gene expression in the two conditions (5759 DE)
+#' #### Change the value of the log2fc to remove bias due to the different amount of gene expression in the two conditions (5813 DE)
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-lfc2", lfc=2)
-
-#' ### Contrast rehydrate vs 80
-contrast_Rehydrate_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Rehydrate_vs_80.", labels = dds$Level, default_prefix="DE-Rehydratevs80")
 
 
 #' ### Venn Diagram
@@ -390,10 +390,10 @@ contrast_Rehydrate_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Rehy
 
 #' #### All DE genes
 #' ```{r venn1, echo=FALSE,eval=FALSE}
-grid.newpage()
-grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
-                       NULL,
-                       fill=pal[1:3]))
+#' grid.newpage()
+#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
+#'                       NULL,
+#'                       fill=pal[1:3]))
 #' ```
 
 #' #### DE genes (up in mutant)
@@ -441,15 +441,16 @@ grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
 
 #' TODO USE THE independent filtering to decide on the background. Think about it
 #' #put reslist instead
-res.list <- contrast_C2d_vs_80$all
-background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.4)]
+#' res.list <- contrast_C2d_vs_80$all
+#' background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.4)]
+#' bla_enr <- gopher(contrast_C2d_vs_80$all, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
+#' 
+
 # enr.list <- lapply(res.list,function(r){
 #      lapply(r,gopher,background=background,task="go",url="picab02")
 # })
 
 
-bla_enr <- gopher(contrast_C2d_vs_80$all, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
-#' 
 #' dev.null <- lapply(names(enr.list),function(n){
 #'     lapply(names(enr.list[[n]]),function(de){
 #'         extractEnrichmentResults(enr.list[[n]][[de]],

@@ -1,5 +1,5 @@
 #' ---
-#' title: "Drought root N. spruce (tech rep merge) Biological QA"
+#' title: "Drought root N. spruce (tech rep merge) Biological QA for expressed genes"
 #' author: "Emanuela Damieto"
 #' date: "`r Sys.Date()`"
 #' output:

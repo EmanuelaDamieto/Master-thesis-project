@@ -24,8 +24,8 @@ library(eulerr)
 Import the annotation file and retrieve the ID of the transcript with long and short introns
 
 ```{r import annotation file and retrieve long and short transcript ID}
-#' agat_renamed_with_pos_short_removed_eggnog_added.gff.gz
-spruce <- read.table(gzfile(here("reference/gff3/Picab02_protein_coding.gff3.gz")), sep = "\t", quote="")
+# agat_renamed_with_pos_short_removed_eggnog_added.gff.gz
+spruce <- read.table(gzfile(here("reference/gff3/Picab02_codingAll.gff3.gz")), sep = "\t", quote="")
 
 #Add the header
 header <- c("seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes")
@@ -317,6 +317,25 @@ write.table(expr_genes, here("data/analysis/expressed_genes.txt"), row.names=FAL
 
 ```
 
+```{r comparison of genes expressed in different conditions}
+vst_mean <- vst %>% transmute(Gene=Gene, "80%" = rowMeans(vst[,2:5]), "60%" = rowMeans(vst[,6:9]), "40%" = rowMeans(vst[,10:13]),"30%" = rowMeans(vst[,14:17]), "30%7d" = rowMeans(vst[,18:20]), "Collapse" = rowMeans(vst[,21:23]), C2d=rowMeans(vst[,24:26]), "Rehydrate" = rowMeans(vst[,27:29]))
+
+#Check how many genes are expressed in C2d, Rehydrate, 307d
+
+
+#there are 10 275 genes that are not expressed in C2d
+#8265 not expressed in control
+#there are 8096 genes that are not expressed in rehydrate
+no_expr_rehydr <- filter(vst_mean, Rehydrate==0) 
+#there are 8829 genes that are not expressed in the 307d
+no_expr_307d <- filter(vst_mean, `30%7d`==0)
+#6173 of these are not expressed in Rehydrated and control
+no_expr_rehydr_cnt <- filter(vst_mean, Rehydrate==0 & `80%`==0)
+#6583 of these are not expressed in 307d and control
+no_expr_307d_cnt <- filter(vst_mean, `30%7d`==0 & `80%`==0)
+#6566 not expressed in C2d and control
+
+```
 
 * Comparison of gene expression between different conditions (short vs long C2d, short vs long C2d, long 80% vs C2d ratio, short 80% vs C2d ratio)
 ```{r comparison of the expression between different conditions}
@@ -373,13 +392,15 @@ ratio <- ggboxplot(vst_not_deg, x="type", y="log_ratio_C2d_80", main="Ratio of t
                    ylab="Normalized gene expression ratio", color = "type", palette =c("#00AFBB", "#E7B800"), ylim=c(-6,10))
 ratio + stat_compare_means(label.y=10)
 
+#normalized since we used the dds with the option countsFromAbundance="lengthScaledTPM"
+
 ```
 
 
 ### Repeats 
 1. Analysis of repeats in introns
 ```{r repeats in introns, echo=FALSE}
-repeats <- read.table(here("results/BedToolsIntersect/intersection_repeats_introns_ovl.tsv"), sep = "\t")
+repeats <- read.table(here("results/BedToolsIntersect/intersection_repeats_introns.tsv"), sep = "\t")
 head_repeats <- c(paste0(header,"_repeats"),paste0(header,"_intron"), "overlap")
 colnames(repeats) <- head_repeats
 head(repeats)
@@ -442,7 +463,7 @@ l+s
 
 2. Analysis of repeats in CDS
 ```{r repeats in CDS}
-repeats_cds <- read.table(here("results/BedToolsIntersect/intersection_repeats_cds_ovl.tsv"), sep = "\t")
+repeats_cds <- read.table(here("results/BedToolsIntersect/intersection_repeats_cds.tsv"), sep = "\t")
 head_repeats_cds <- c(paste0(header,"_repeats"),paste0(header,"_cds"), "overlap")
 colnames(repeats_cds) <- head_repeats_cds
 head(repeats_cds)
@@ -504,6 +525,7 @@ s <- ggplot(repeats_cds_short_unique, aes(overlap))+
 l+s 
 
 ```
+
 ### Perform a statistical test 
 1. Perform a Fisher test on the number of genes
 ```{r DEG in C2d vs 80}
@@ -677,6 +699,7 @@ ggplot(df_chr_genes_long, aes(chr))+
 ```
 
 * Consider the first intron length 
+1. Consider the first intron length of the most representative mRNA of each gene 
 ```{r genes with long introns considering the first intron length}
 #dataset with the representative transcript per gene 
 #data processing
@@ -712,7 +735,7 @@ ggplot(df_chr_genes_long, aes(chr))+
 # 
 # hist(log10(longest_intron$length))
 
-mRNA_repre <- read.table(here("reference/gff3/Picab02_protein_coding_representative_mRNA.gff3.gz"), sep = "\t", quote="")
+mRNA_repre <- read.table(here("reference/gff3/Picab02_codingRepresentative.gff3.gz"), sep = "\t", quote="")
 colnames(mRNA_repre) <-header
 mRNA_repre_intron <- subset(mRNA_repre, type=="intron")
 
