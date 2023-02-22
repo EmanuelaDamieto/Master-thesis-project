@@ -18,13 +18,8 @@ BiocManager::install("GenomicRanges")
 
 ```{r import annotation file}
 #Set the directory and import the data
-#setwd("/mnt/picea/home/edamieto/Git/Master-thesis-project/pipeline")
-#spruce_pine <- read.table("../data/gff3/spruce_pine-extended_master_complete.gff3", sep = "\t")
-#spruce_pine <- read.table(gzfile("../reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa.gff3.gz"), sep = "\t")
 library("here")
-spruce_pine <- read.table(gzfile(here("reference/gff3/all_merged_no_overlaps_no_dup_features_gt_gff_after_merge_ensembl_renamed_over_30aa_salmon_redundant_mRNA_removed.gff3.gz")), sep = "\t")
-
-
+spruce_pine <- read.table(gzfile(here("reference/gff3/Picab02_codingAll.gff3.gz")), sep = "\t")
 #gff = general feature format
 
 #Add the header
@@ -1053,14 +1048,6 @@ comparisonplot(merge_cds_intron$width.cds, merge_cds_intron$width.intron, xlab="
 comparisonplot(log10(merge_cds_intron$width.cds), log10(merge_cds_intron$width.intron), xlab="CDS length", ylab="Intron length", main="Comparisonplot of CDS length vs intron length in log scale")
 
 comparisonplot(merge_cds_intron$width.cds, merge_cds_intron$width.intron, log="xy", xlab="CDS length", ylab="Intron length", main="Comparisonplot of CDS length vs intron length in log scale")
-
-
-
-
-
-
-
-
 ```
 
 

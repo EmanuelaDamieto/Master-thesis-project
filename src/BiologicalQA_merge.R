@@ -379,7 +379,6 @@ hm <- pheatmap(mat,
                labels_col = conds,
                angle_col = 90,
                legend = F)
-plot(as.hclust(hm_reduced$colDendrogram),xlab="",sub="", cex.axis=2)
 
 #' `r emoji("point_right")` **The different conditions are not so different in gene expression level except the extreme conditions**
 #' 

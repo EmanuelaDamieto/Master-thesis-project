@@ -1,5 +1,5 @@
 #' ---
-#' title: "Drought root N. spruce Differential Expression for expressed genes"
+#' title: "Differential Expression for expressed genes in drought roots of Norway spruce"
 #' author: "Emanuela Damieto"
 #' date: "`r Sys.Date()`"
 #' output:
@@ -276,7 +276,8 @@ extractEnrichmentResults <- function(enrichment,task="go",
 #' ```{r load, echo=FALSE,eval=FALSE}
 #' Here you are meant to load an RData object
 #' that contains a DESeqDataSet object. If you ran the 
-#' biological QA template, you need not change anything
+#' biological QA template, you need not change anything.
+#' Load the dds with merged technical replicates of expressed genes
 #' 
 #' ```
 
@@ -284,9 +285,7 @@ load(here("data/analysis/salmon/dds_merge_expr_genes.rda"))
 
 #' ## Normalisation for visualisation
 #' ```{r normalisation, echo=FALSE,eval=FALSE, message=FALSE}
-#' save(vst,file=here("data/analysis/DE/vst-aware.rda"))
-#' write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
-#'             here("data/analysis/DE/vst-aware.tsv"))
+#' Normalize the dds
 #' ```           
 vsd <- varianceStabilizingTransformation(dds,blind=FALSE)
 vst <- assay(vsd)
@@ -297,7 +296,7 @@ write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
             here("data/analysis/DE/vst-aware-exprGenes.tsv"))
 
 
-#' ## Gene of interests
+#' # Gene of interests
 #' ```{r goi, echo=FALSE,eval=FALSE}
 #' Here, you can plot the expression pattern of your gene of
 #' interest. You need to have a list of genes in a text file, one geneID per line
@@ -310,7 +309,7 @@ write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
 #' dev.null <- lapply(goi,line_plot,dds=dds,vst=vst)
 #' ```
 
-#' ## Differential Expression
+#' # Differential Expression
 #' ```{r import dds, echo=FALSE,eval=FALSE, message=FALSE}
 #' Import the dds object with merged technical replicates
 #' ```
@@ -324,7 +323,7 @@ plotDispEsts(dds)
 #' Check the different contrasts
 resultsNames(dds)
 
-#' ## Results
+#' # Results
 #' ```{r res, echo=FALSE,eval=FALSE}
 #' Here you need to define the contrast you want to 
 #' study - see the example in the next block. 
@@ -371,17 +370,17 @@ resultsNames(dds)
 #' ```
 
 
-#' ### Contrast C2d vs 80
+#' ## Contrast C2d vs 80
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' #### Show the heatmap just for the constrast we are interested in (C2d, 80), (10 544 DE)
+#' ### Show the heatmap just for the constrast we are interested in (C2d vs control)
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' #### Change the value of the log2fc to remove bias due to the different amount of gene expression in the two conditions (5289 DE)
+#' #### Change the value of the log2fc to remove bias due to the different amount of gene expressed in the two conditions
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-lfc2", lfc=2)
 
 
-#' ### Venn Diagram
+#' ## Venn Diagram
 #' ```{r venn, echo=FALSE,eval=FALSE}
 #' CHANGEME - Here, you typically would have run several contrasts and you want
 #' to assess their overlap plotting VennDiagrams.
@@ -392,10 +391,10 @@ contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.
 
 #' #### All DE genes
 #' ```{r venn1, echo=FALSE,eval=FALSE}
-grid.newpage()
-grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
-                       NULL,
-                       fill=pal[1:3]))
+#' grid.newpage()
+#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
+#'                       NULL,
+#'                       fill=pal[1:3]))
 #' ```
 
 #' #### DE genes (up in mutant)
@@ -414,7 +413,7 @@ grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
 #'                        fill=pal[1:3]))
 #' ```
 
-#' ### Gene Ontology enrichment
+#' ## Gene Ontology enrichment
 #' ```{r go, echo=FALSE,eval=FALSE}
 #' Once you have obtained a list of candidate genes, you most probably want
 #' to annotate them.
@@ -437,36 +436,47 @@ grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
 #' the corresponding go enrichment.
 #' 
 #' Make sure to change the `url` to match your species
-#' 
-#' 
-
-
-#' TODO USE THE independent filtering to decide on the background. Think about it
-#' #put reslist instead
-#' res.list <- contrast_C2d_vs_80$all
-#' background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.4)]
-#' 
-#' bla_enr <- gopher(contrast_C2d_vs_80$all, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
-#' 
-#' 
-
-#' enr.list <- lapply(res.list,function(r){
-#'      lapply(r,gopher,background=background,task="go",url="picab02")
-#' })
-
-#' 
-#' dev.null <- lapply(names(enr.list),function(n){
-#'     lapply(names(enr.list[[n]]),function(de){
-#'         extractEnrichmentResults(enr.list[[n]][[de]],
-#'                                 diff.exp=de,
-#'                                 genes=res.list[[n]][[de]],
-#'                                 default_prefix=paste(n,de,sep="-"),
-#'                                 url="athaliana")
-#'     })
-#' })
 #' ```
 
+#' ### GO of all, up and down regulated genes of the last contrast (log2fc=2)
+background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.4)]
 
+res.list <- contrast_C2d_vs_80
+
+enr.list <- lapply(res.list, gopher,background=background, alpha=0.05, task="go",url="picab02", endpoint = "enrichment")
+
+#' #### Go of all DE genes
+dev.null <- extractEnrichmentResults(enr.list$all, diff.exp= "all", url="piceab02")
+
+#' #### Go of upregulated DE genes
+dev.null <- extractEnrichmentResults(enr.list$up, diff.exp= "up", url="piceab02")
+
+#' #### Go of downregulated DE genes
+dev.null <- extractEnrichmentResults(enr.list$dn, diff.exp= "dn", url="piceab02")
+
+#' Note: up and down refers to C2d so the upregulated genes are upregulated in C2d and the same is true for the downregulated one
+
+
+#' ```{r not, echo=FALSE,eval=FALSE}
+#' write.table(res.list$all, here("data/analysis/DE_c2d_cnt_all.txt"), row.names=FALSE, col.names=FALSE, quote=FALSE)
+#' write.table(res.list$up, here("data/analysis/DE_c2d_cnt_up.txt"), row.names=FALSE, col.names=FALSE, quote=FALSE)
+#' write.table(res.list$dn, here("data/analysis/DE_c2d_cnt_down.txt"), row.names=FALSE, col.names=FALSE, quote=FALSE)
+#' 
+#' dev.null <- lapply(enr.list, extractEnrichmentResults, url="piceab02")
+#' 
+#' dev.null <- lapply(names(enr.list),function(n){
+#'      lapply(names(enr.list[[n]]),function(de){
+#'          extractEnrichmentResults(enr.list[[n]][[de]],
+#'                                  diff.exp=de,
+#'                                  genes=res.list[[n]][[de]],
+#'                                  default_prefix=paste(n,de,sep="-"),
+#'                                  url="piceab02")
+#'      })
+#'  })
+#'  
+#'  ```
+
+#' 
 #' # Session Info 
 #' <details><summary>Session Info</summary>
 #'  ```{r session info, echo=FALSE, message=FALSE}

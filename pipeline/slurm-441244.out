@@ -1,5 +1,0 @@
-+ [[ 3 -ne 3 ]]
-+ [[ ! -f /mnt/picea/storage/singularity/kogia/genometools_1.6.2.sif ]]
-+ [[ -z /mnt:/mnt ]]
-+ [[ ! -f /mnt/picea/storage/reference/Picea-abies/v2.0/gff3/spruce_pine-extended_master.gff3 ]]
-/tmp/slurmd/job441244/slurm_script: line 25: conditional binary operator expected

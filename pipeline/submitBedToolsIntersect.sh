@@ -15,8 +15,8 @@ module load BEDTools
 
 #3 arguments: 2 input files and 1 output directory
 #Repeats file
-#INREP=$(realpath ../reference/gff3/pabies-2.0_chromosomes_and_unplaced.fa.repeats.gff)
-INREP=$(realpath ../reference/gff3/Picab02_chromosomes_and_unplaced_repeats.gff3.gz)
+#INREP=$(realpath ../reference/gff3/Picab02_chromosomes_and_unplaced_repeats.gff3.gz)
+INREP=$(realpath ../reference/gff3/Picab02_repeats.gff3.gz)
 
 #Annotation file 
 INTR=$(realpath ../data/gff3/introns.gff3)

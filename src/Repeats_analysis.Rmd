@@ -1,0 +1,92 @@
+---
+title: "Analysis of repeats"
+author: "Emanuela Damieto"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+      fig_width: 9
+      fig_height: 6
+      toc: true
+      number_sections: true
+      toc_depth: 4
+      toc_float:
+        collapsed: TRUE
+        smooth_scroll: TRUE
+      code_folding: hide
+      theme: "flatly"
+      highlight: pygments
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(dplyr)
+```
+
+## Import files 
+```{r repeats in introns, echo=FALSE}
+repeats <- read.table(here("results/BedToolsIntersect/intersection_repeats_introns.tsv"), sep = "\t")
+header <- c("seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes")
+head_repeats <- c(paste0(header,"_repeats"),paste0(header,"_intron"), "overlap")
+colnames(repeats) <- head_repeats
+
+#keep just the type of TE
+repeats$attributes_repeats <- sub(".*:","",repeats$attributes_repeats)
+repeats$attributes_repeats <- sub(" .*","",repeats$attributes_repeats)
+
+#keep just the parent ID of the intron so the transcript ID
+repeats$attributes_intron <- sub(".*Parent%3d","",repeats$attributes_intron)
+repeats$attributes_intron <- sub(";.*","",repeats$attributes_intron)
+
+#Keep unique repeats (since there are some repeats that are present in more repeats)
+repeats_unique <- repeats %>% distinct(seqid_repeats,start_repeats,end_repeats,.keep_all = TRUE) %>%        mutate(repeat_category=ifelse(grepl("TE",attributes_repeats),"TE",ifelse(grepl("line",attributes_repeats),"LINE",ifelse(grepl(')n',attributes_repeats),"LowComplexity","Others"))))
+
+
+repeats_type <- read.table(here("data/Repeats/pabies-2.0_chromosomes.fasta.man"), fill=TRUE, skip = 3, header=FALSE)
+
+header_repeats <- c("SW score","perc div.", "perc del.", "perc ins.", "query sequence", "position in query begin", "position in query end", "position in query (left)", "idk", "matching repeat", "repeat class/family", "position in repeat begin", "position in repeat end", "position in repeat (left)", "ID")
+
+colnames(repeats_type) <- header_repeats
+
+repeats_type <- repeats_type %>% filter(repeats_type$`SW score`!="*")
+
+translation <- repeats_type[,10:11] %>% distinct(`matching repeat`,.keep_all = TRUE)
+
+repeats_tr <- repeats_unique %>% left_join(translation, by=join_by("attributes_repeats" =="matching repeat")) 
+
+write.csv(repeats_tr, here("data/Repeats/repeats.csv"), row.names = FALSE)
+
+```
+
+1. Analysis of repeats in introns
+```{r repeats in introns, echo=FALSE}
+repeats_tr <- read.csv(here("data/Repeats/repeats.csv"))
+
+long_introns_id <- read.table(here("data/analysis/long_introns_ID.txt"), row.names = TRUE)
+short_introns_id <- read.table(here("data/analysis/short_introns_ID.txt"), row.names= TRUE)  
+
+#retrieve repeats
+repeats_long <- repeats_tr %>% filter(attributes_intron %in% long_introns_id)
+repeats_short <- repeats_tr %>% filter(attributes_intron %in% short_introns_id)
+
+dim(repeats_long)[1]/dim(repeats)[1]
+
+repeats_long_type <- unique(repeats_long$attributes_repeats) #11245
+repeats_short_type <- unique(repeats_short$attributes_repeats) #2991
+length(intersect(repeats_long_type, repeats_short_type)) #2828
+
+l <- ggplot(repeats_long, aes(overlap))+
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap length in\ntranscripts with long introns")
+
+s <- ggplot(repeats_short, aes(overlap))+
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap length in\ntranscripts with short introns")
+
+l+s 
+
+```

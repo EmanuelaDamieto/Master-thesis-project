@@ -1,5 +1,5 @@
 #' ---
-#' title: "Drought root N. spruce Differential Expression"
+#' title: "Differential Expression analysis of drought roots of Norway spruce"
 #' author: "Emanuela Damieto"
 #' date: "`r Sys.Date()`"
 #' output:
@@ -43,12 +43,6 @@ mar <- par("mar")
 
 #' * Functions
 #' 1. plot specific gene expression
-#' ```{r edit1, echo=FALSE,eval=FALSE}
-#' CHANGEME - here you need to change the variables in the 
-#' plot to display the expression values across your samples
-#' The example below has 2 variables MGenotype and MDay. These 
-#' need replacing by the variable(s) of interest in your project
-#' ```
 "line_plot" <- function(dds=dds,vst=vst,gene_id=gene_id){
     message(paste("Plotting",gene_id))
     sel <- grepl(gene_id,rownames(vst))
@@ -276,18 +270,16 @@ extractEnrichmentResults <- function(enrichment,task="go",
 #' ```{r load, echo=FALSE,eval=FALSE}
 #' Here you are meant to load an RData object
 #' that contains a DESeqDataSet object. If you ran the 
-#' biological QA template, you need not change anything
-#' 
+#' biological QA template, you need not change anything.
+#' If you have technical replicates merge them before to perform the DE analysis
 #' ```
 
 load(here("data/analysis/salmon/dds_merge.rda"))
 
 #' ## Normalisation for visualisation
-#' ```{r normalisation, echo=FALSE,eval=FALSE, message=FALSE}
-#' save(vst,file=here("data/analysis/DE/vst-aware.rda"))
-#' write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
-#'             here("data/analysis/DE/vst-aware.tsv"))
-#' ```           
+#' ```{r normalisation, echo=FALSE, eval=FALSE, warning=FALSE, message=FALSE}
+#' Here you have to normalize the dds object before to perform the DE analysis
+#' ```        
 vsd <- varianceStabilizingTransformation(dds,blind=FALSE)
 vst <- assay(vsd)
 vst <- vst - min(vst)
@@ -296,23 +288,9 @@ save(vst,file=here("data/analysis/DE/vst-aware.rda"))
 write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
             here("data/analysis/DE/vst-aware.tsv"))
 
-
-#' ## Gene of interests
-#' ```{r goi, echo=FALSE,eval=FALSE}
-#' Here, you can plot the expression pattern of your gene of
-#' interest. You need to have a list of genes in a text file, one geneID per line
-#' The ID should exist in your vst data.
-#' Note that for the plot to work, you also need to edit the first function (`line_plot`)
-#' at the top of this file
-#' 
-#' goi <- read_lines(here("doc/goi.txt"))
-#' stopifnot(all(goi %in% rownames(vst)))
-#' dev.null <- lapply(goi,line_plot,dds=dds,vst=vst)
-#' ```
-
-#' ## Differential Expression
-#' ```{r import dds, echo=FALSE,eval=FALSE, message=FALSE}
-#' Import the dds object with merged technical replicates
+#' # Differential Expression
+#' ```{r import dds, echo=FALSE,eval=FALSE, warning=FALSE, message=FALSE}
+#' Perform the DE analysis using the DESeq package
 #' ```
 dds <- DESeq(dds)
 
@@ -323,10 +301,10 @@ plotDispEsts(dds)
 #' * Check the different contrasts
 resultsNames(dds)
 
-#' ## Results
+#' # Results
 #' ```{r res, echo=FALSE,eval=FALSE}
 #' Here you need to define the contrast you want to 
-#' study - see the example in the next block. 
+#' study 
 #' 
 #' The `contrast` can be given
 #' by name, as a list (numerator/denominator) or as a vector of weight (e.g. c(0,1));
@@ -369,61 +347,28 @@ resultsNames(dds)
 
 #' ```
 
-#' ### Contrast C2d vs 80
+#' ## Contrast C2d vs control
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' #### Show the heatmap just for the contrast we are interested in (C2d, 80), (11 059 DE)
+#' ### Show the heatmap just for the contrast we are interested in (C2d vs control)
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' #### Change the value of the log2fc to remove bias due to the different amount of gene expression in the two conditions (5813 DE)
+#' ### Change the value of the log2fc to remove bias due to the different amount of gene expressed in the two conditions 
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-lfc2", lfc=2)
 
 
-#' ### Venn Diagram
-#' ```{r venn, echo=FALSE,eval=FALSE}
-#' CHANGEME - Here, you typically would have run several contrasts and you want
-#' to assess their overlap plotting VennDiagrams.
-#' 
-#' In the examples below, we assume that these resutls have been saved in a list
-#' called `res.list`
-#' ```
-
-#' #### All DE genes
-#' ```{r venn1, echo=FALSE,eval=FALSE}
-#' grid.newpage()
-#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
-#'                       NULL,
-#'                       fill=pal[1:3]))
-#' ```
-
-#' #### DE genes (up in mutant)
-#' ```{r venn2, echo=FALSE,eval=FALSE}
-#' grid.newpage()
-#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","up"),
-#'                        NULL,
-#'                        fill=pal[1:3]))
-#' ```
-
-#' #### DE genes (up in control)
-#' ```{r venn3, echo=FALSE,eval=FALSE}
-#' grid.newpage()
-#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","dn"),
-#'                        NULL,
-#'                        fill=pal[1:3]))
-#' ```
-
-#' ### Gene Ontology enrichment
+#' ## Gene Ontology enrichment
 #' ```{r go, echo=FALSE,eval=FALSE}
 #' Once you have obtained a list of candidate genes, you most probably want
 #' to annotate them.
 #' 
-#' In the following example, we first identify the background; _i.e._ the
+#' We first identify the background; _i.e._ the
 #' population of expressed genes. We select the genes expressed in a least
 #' 2 replicate of one condition at a cutoff of `exp`.
 #' 
-#' Next we run the enrichment, in the example against `athaliana` using 
+#' Next we run the enrichment using 
 #' the gofer3 REST API (interfaced through the gopher.R script loaded at the
-#' beginning of this fil).
+#' beginning of this file).
 #' 
 #' Finally we export the go enrichment as a complete table.
 #' We used to export another table consisting
@@ -437,10 +382,6 @@ contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.
 #' Make sure to change the `url` to match your species
 #' 
 #' 
-
-
-#' TODO USE THE independent filtering to decide on the background. Think about it
-#' #put reslist instead
 #' res.list <- contrast_C2d_vs_80$all
 #' background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.4)]
 #' bla_enr <- gopher(contrast_C2d_vs_80$all, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
@@ -461,13 +402,29 @@ contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.
 #'     })
 #' })
 #' ```
+#' 
 
+#' #### GO of genes expressed just under stress condition (C2d)
+#' Use all the genes as background 
+background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.0)]
+
+res.list <- read.table(here("data/analysis/just_expr_C2d.txt"))
+bla_enr <- gopher(res.list$V1, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
+dev.null <- extractEnrichmentResults(bla_enr,
+                                    url="piceab02")
+
+
+#' #### GO of genes expressed just in the control 
+#' Use all the genes as background 
+res.list_cnt <- read.table(here("data/analysis/just_expr_cnt.txt"))
+bla_enr_cnt <- gopher(res.list_cnt$V1, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
+dev.null <- extractEnrichmentResults(bla_enr_cnt,
+                                     url="piceab02")
 
 #' # Session Info 
 #' <details><summary>Session Info</summary>
 #'  ```{r session info, echo=FALSE, message=FALSE}
 #'  sessionInfo()
-#'
 #'  ```
 
 
