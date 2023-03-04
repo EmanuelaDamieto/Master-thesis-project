@@ -21,25 +21,29 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 library(here)
 library(dplyr)
+library(ggpubr)
+library(data.table)
 ```
 
-## Import files 
-```{r repeats in introns, echo=FALSE}
-repeats <- read.table(here("results/BedToolsIntersect/intersection_repeats_introns.tsv"), sep = "\t")
+# Data manipulation
+* Repeats in introns
+```{r repeats in introns import}
+repeats_intron <- read.table(here("results/BedToolsIntersect/intersection_repeats_introns.tsv"), sep = "\t")
 header <- c("seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes")
 head_repeats <- c(paste0(header,"_repeats"),paste0(header,"_intron"), "overlap")
-colnames(repeats) <- head_repeats
+colnames(repeats_intron) <- head_repeats
 
 #keep just the type of TE
-repeats$attributes_repeats <- sub(".*:","",repeats$attributes_repeats)
-repeats$attributes_repeats <- sub(" .*","",repeats$attributes_repeats)
+repeats_intron$attributes_repeats <- sub(".*:","",repeats_intron$attributes_repeats)
+repeats_intron$attributes_repeats <- sub(" .*","",repeats_intron$attributes_repeats)
 
 #keep just the parent ID of the intron so the transcript ID
-repeats$attributes_intron <- sub(".*Parent%3d","",repeats$attributes_intron)
-repeats$attributes_intron <- sub(";.*","",repeats$attributes_intron)
+repeats_intron$attributes_intron <- sub(".*Parent%3d","",repeats_intron$attributes_intron)
+repeats_intron$attributes_intron <- sub(";.*","",repeats_intron$attributes_intron)
 
 #Keep unique repeats (since there are some repeats that are present in more repeats)
-repeats_unique <- repeats %>% distinct(seqid_repeats,start_repeats,end_repeats,.keep_all = TRUE) %>%        mutate(repeat_category=ifelse(grepl("TE",attributes_repeats),"TE",ifelse(grepl("line",attributes_repeats),"LINE",ifelse(grepl(')n',attributes_repeats),"LowComplexity","Others"))))
+repeats_unique_intron <- repeats_intron %>% distinct(seqid_repeats,start_repeats,end_repeats,.keep_all = TRUE) %>%        mutate(repeat_category=ifelse(grepl("TE",attributes_repeats),"TE",ifelse(grepl("line",attributes_repeats),"LINE",ifelse(grepl(')n',attributes_repeats),"LowComplexity","Others"))))
+
 
 
 repeats_type <- read.table(here("data/Repeats/pabies-2.0_chromosomes.fasta.man"), fill=TRUE, skip = 3, header=FALSE)
@@ -50,43 +54,133 @@ colnames(repeats_type) <- header_repeats
 
 repeats_type <- repeats_type %>% filter(repeats_type$`SW score`!="*")
 
+
 translation <- repeats_type[,10:11] %>% distinct(`matching repeat`,.keep_all = TRUE)
 
-repeats_tr <- repeats_unique %>% left_join(translation, by=join_by("attributes_repeats" =="matching repeat")) 
+repeats_tr_intron <- repeats_unique_intron %>% left_join(translation, by=join_by("attributes_repeats" =="matching repeat")) 
 
-write.csv(repeats_tr, here("data/Repeats/repeats.csv"), row.names = FALSE)
+write.csv(repeats_tr_intron, here("data/Repeats/repeats_tr_intron.csv"), row.names = FALSE)
 
 ```
+
+* Repeats in CDS
+```{r repeats in CDS import}
+repeats_cds <- read.table(here("results/BedToolsIntersect/intersection_repeats_cds.tsv"), sep = "\t")
+header <- c("seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes")
+head_repeats_cds <- c(paste0(header,"_repeats"),paste0(header,"_cds"), "overlap")
+colnames(repeats_cds) <- head_repeats_cds
+
+#keep just the type of TE
+repeats_cds$attributes_repeats <- sub(".*:","",repeats_cds$attributes_repeats)
+repeats_cds$attributes_repeats <- sub(" .*","",repeats_cds$attributes_repeats)
+
+#keep just the parent ID of the intron so the transcript ID
+repeats_cds$attributes_cds <- sub(".*Parent%3d","",repeats_cds$attributes_cds)
+repeats_cds$attributes_cds <- sub(";.*","",repeats_cds$attributes_cds)
+
+#Keep unique repeats (since there are some repeats that are present in more repeats)
+repeats_unique_cds <- repeats_cds %>% distinct(seqid_repeats,start_repeats,end_repeats,.keep_all = TRUE) %>%        mutate(repeat_category=ifelse(grepl("TE",attributes_repeats),"TE",ifelse(grepl("line",attributes_repeats),"LINE",ifelse(grepl(')n',attributes_repeats),"LowComplexity","Others"))))
+
+
+repeats_tr_cds <- repeats_unique_cds %>% left_join(translation, by=join_by("attributes_repeats" =="matching repeat")) 
+
+write.csv(repeats_tr_cds, here("data/Repeats/repeats_tr_cds.csv"), row.names = FALSE)
+
+```
+
+
 
 1. Analysis of repeats in introns
-```{r repeats in introns, echo=FALSE}
-repeats_tr <- read.csv(here("data/Repeats/repeats.csv"))
+```{r repeats in introns analysis}
+repeats_tr_intron <- read.csv(here("data/Repeats/repeats_tr_intron.csv"))
 
-long_introns_id <- read.table(here("data/analysis/long_introns_ID.txt"), row.names = TRUE)
-short_introns_id <- read.table(here("data/analysis/short_introns_ID.txt"), row.names= TRUE)  
+#import the lists of IDs of transcripts with long and short introns
+long_introns <- read.table(here("data/analysis/long_introns_ID.txt"), col.names="ID")
+short_introns <- read.table(here("data/analysis/short_introns_ID.txt"), col.names = "ID") 
 
-#retrieve repeats
-repeats_long <- repeats_tr %>% filter(attributes_intron %in% long_introns_id)
-repeats_short <- repeats_tr %>% filter(attributes_intron %in% short_introns_id)
+#add a column with intron type
+repeats_tr_intron <- repeats_tr_intron %>% mutate(type=ifelse(attributes_intron %in% short_introns$ID,"short",ifelse(attributes_intron %in% long_introns$ID, "long", "no introns"))) %>% arrange(desc(overlap))
 
-dim(repeats_long)[1]/dim(repeats)[1]
+#number of transcripts
+#length(unique(repeats_tr_intron$attributes_intron))
+#number of transcript with long introns
+#length(intersect(unique(repeats_tr_intron$attributes_intron),long_introns$ID))
 
-repeats_long_type <- unique(repeats_long$attributes_repeats) #11245
-repeats_short_type <- unique(repeats_short$attributes_repeats) #2991
-length(intersect(repeats_long_type, repeats_short_type)) #2828
 
-l <- ggplot(repeats_long, aes(overlap))+
-  geom_boxplot()+
-  coord_flip()+
+long_introns_repeats <- repeats_tr_intron %>% filter(attributes_intron %in% long_introns$ID) 
+print("The percentage of repeats in long introns is")
+dim(long_introns_repeats)[1]/dim(repeats_tr_intron)[1]*100
+
+#plot the intron length divided by intron type
+ggboxplot(repeats_tr_intron, x="type", y="overlap", yscale="log10", ylab="overlap length (bp)", color="type", title="Boxplot of repeats length in introns in transcript\nwith long and short introns", notch=TRUE) + stat_compare_means()
+
+#retrieve class type occurrence in all the repeats
+print("All repeats")
+table(repeats_type$`repeat class/family`, exclude = c("begin","position"))/dim(repeats_type)[1]
+
+#class type occurrence in all introns
+print("All repeats in introns")
+table(repeats_tr_intron$repeat.class.family)/dim(repeats_tr_intron)[1]
+
+ggplot(repeats_tr_intron, aes(type, fill=repeat.class.family))+
+  geom_bar(position="fill", color="gray")+
   theme_classic()+
-  labs(title="Boxplot of the overlap length in\ntranscripts with long introns")
+  theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1))+
+  labs(y="Proportion",fill="Repeat class family")
 
-s <- ggplot(repeats_short, aes(overlap))+
-  geom_boxplot()+
-  coord_flip()+
+
+#create two dataset for the different intron types 
+repeats_long_intron <- repeats_tr_intron %>% filter(attributes_intron %in% long_introns$ID) 
+repeats_short_intron <- repeats_tr_intron %>% filter(attributes_intron %in% short_introns$ID)
+
+
+#class type occurrence in long introns
+print("Repeats in long introns")
+table(repeats_long_intron$repeat.class.family)/dim(repeats_long_intron)[1]
+
+#class type occurrence in short introns
+print("Repeats in short introns")
+table(repeats_short_intron$repeat.class.family)/dim(repeats_short_intron)[1]
+```
+2. Analysis of repeats in CDS
+
+```{r repeats in cds analysis}
+repeats_tr_cds <- read.csv(here("data/Repeats/repeats_tr_cds.csv"))
+
+#add a column with intron type
+repeats_tr_cds <- repeats_tr_cds %>% mutate(type=ifelse(attributes_cds %in% short_introns$ID,"short", ifelse(attributes_cds %in% long_introns$ID, "long", "no introns"))) %>% filter(type!="no introns") %>% arrange(desc(overlap))
+
+#plot the intron length divided by intron type
+repeats_tr_cds$type <- factor(repeats_tr_cds$type, levels=c("long","short"))
+ggboxplot(repeats_tr_cds, x="type", y="overlap", yscale="log10", color="type", ylab= "overlap length (bp)", title="Boxplot of repeats length in cds of transcript\nwith long and short introns", notch=TRUE) + stat_compare_means()
+
+long_cds_repeats <- repeats_tr_cds %>% filter(attributes_cds %in% long_introns$ID) 
+short_cds_repeats <- repeats_tr_cds %>% filter(attributes_cds %in% short_introns$ID) 
+print("The percentage of repeats in CDS of transcripts with long introns is")
+dim(long_cds_repeats)[1]/dim(repeats_tr_cds)[1]*100
+
+
+#class type occurrence in all cds
+print("All repeats in cds")
+table(repeats_tr_cds$repeat.class.family)/dim(repeats_tr_cds)[1]
+
+ggplot(repeats_tr_cds, aes(type, fill=repeat.class.family))+
+  geom_bar(position="fill", color="gray")+
   theme_classic()+
-  labs(title="Boxplot of the overlap length in\ntranscripts with short introns")
+  theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1))+
+  labs(y="Percentage", fill="Repeat class family")
 
-l+s 
+#create two dataset for the different intron types 
+repeats_long_cds <- repeats_tr_cds %>% filter(attributes_cds %in% long_introns$ID) 
+repeats_short_cds <- repeats_tr_cds %>% filter(attributes_cds %in% short_introns$ID)
+
+#class type occurrence in long cds
+print("Repeats in cds in genes with long introns")
+table(repeats_long_cds$repeat.class.family)/dim(repeats_long_cds)[1]
+
+#class type occurrence in short cds
+print("Repeats in cds in genes with short introns")
+table(repeats_short_cds$repeat.class.family)/dim(repeats_short_cds)[1]
 
 ```
+

@@ -27,6 +27,8 @@ spruce_pine <- read.table(gzfile(here("reference/gff3/Picab02_codingAll.gff3.gz"
 header <- c("seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes")
 colnames(spruce_pine) <- header
 
+table(spruce_pine$type)
+
 #Subset the dataframe to retrieve the information that we want
 genes <- subset(spruce_pine, type=="gene")
 introns <- subset(spruce_pine, type=="intron")  
@@ -74,8 +76,8 @@ short_introns <- df_introns_cum %>% filter(log10(length)<4)
 long_introns_id <- long_introns$parent
 short_introns_id <- short_introns$parent
 
-write.table(short_introns_id, here("data/analysis/short_introns_ID.txt"), col.names=FALSE, quote= FALSE)
-write.table(long_introns_id, here("data/analysis/long_introns_ID.txt"), col.names=FALSE, quote= FALSE)
+write.table(short_introns_id, here("data/analysis/short_introns_ID.txt"), col.names=FALSE, row.names = FALSE, quote= FALSE)
+write.table(long_introns_id, here("data/analysis/long_introns_ID.txt"), col.names=FALSE, row.names=FALSE, quote= FALSE)
 
 #divide the dataset in long and short introns
 df_long_introns_cum <- df_introns_cum %>% filter(parent %in% long_introns_id,)
@@ -199,16 +201,16 @@ short_introns_mrna$type <- "short"
 introns_mrna <- bind_rows(long_introns_mrna, short_introns_mrna)
 
 #Use ggpubr package to plot the boxplot
-intron_boxplot <- ggboxplot(introns_mrna, x="type", y="length", yscale="log10", color="type", ylim=c(1,1000000), title="Boxplot of log cumulative intron length of transcript\nwith long and short introns", notch=TRUE) 
+intron_boxplot <- ggboxplot(introns_mrna, x="type", y="length", yscale="log10", color="type", ylab="length (bp)", ylim=c(1,1000000), title="Boxplot of log cumulative intron length of transcript\nwith long and short introns", notch=TRUE) 
 intron_boxplot + stat_compare_means(label.y.npc = "top", label.x.npc="centre")
 
 #violin plot 
-intron_violinplot <- ggviolin(introns_mrna, x="type", y="length", yscale="log10", color="type", ylim=c(1,1000000), title="Boxplot of log cumulative intron length of transcript\nwith long and short introns", fill="type") 
+intron_violinplot <- ggviolin(introns_mrna, x="type", y="length", yscale="log10", color="type", ylab="length (bp)", ylim=c(1,1000000), title="Boxplot of log cumulative intron length of transcript\nwith long and short introns", fill="type") 
 intron_violinplot + stat_compare_means(label.y.npc = "top", label.x.npc="centre")
 
 ```
 
-## Compare long and short intron length
+## Compare long and short CDS length
 Compare the cumulative length of CDS in transcripts with long and short introns (or compare the length of introns in transcripts with long and short cumulative intron length)
 
 ```{r CDS long vs short introns, echo=FALSE, warning=FALSE}
@@ -227,11 +229,11 @@ short_introns_mrna_cds$type <- "short"
 introns_mrna_cds <- bind_rows(long_introns_mrna_cds, short_introns_mrna_cds)
 
 #Use ggpubr package to plot the boxplot
-cds_boxplot <- ggboxplot(introns_mrna_cds, x="type", y="length", yscale="log10", color="type", title="Boxplot of log cumulative CDS length of transcript\nwith long and short introns", notch=TRUE) 
+cds_boxplot <- ggboxplot(introns_mrna_cds, x="type", y="length", yscale="log10", color="type", ylab="length (bp)", title="Boxplot of log cumulative CDS length of transcript\nwith long and short introns", notch=TRUE) 
 cds_boxplot + stat_compare_means(label.y.npc = "top", label.x.npc="centre")
 
 #violin plot 
-cds_violinplot <- ggviolin(introns_mrna_cds, x="type", y="length", yscale="log10", color="type", title="Boxplot of log cumulative CDS length of transcript\nwith long and short introns", fill="type") 
+cds_violinplot <- ggviolin(introns_mrna_cds, x="type", y="length", yscale="log10", color="type", ylab="length (bp)", title="Boxplot of log cumulative CDS length of transcript\nwith long and short introns", fill="type") 
 cds_violinplot + stat_compare_means(label.y.npc = "top", label.x.npc="centre")
 
 

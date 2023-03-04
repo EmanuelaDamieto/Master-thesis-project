@@ -1,13 +1,17 @@
 # Master Thesis Project 
-This is the project template from the Umeå Plant Science Centre Bioinformatics Facility. 
 
-To use it for your project, you can check this [GitHub gist](https://gist.github.com/nicolasDelhomme/46a1053d277510b95692318bd1732b6d)
+## Repo description
+- data: contains the data
+- pipeline: contains the bash script to submit and run tools
+- reference: contains files required to perform the analysis
+- results: contain the results of the tools used
+- singularity: conain singularity containers
+- src: contains R script used to perform the data analysis and the HTML documents originated from them
+- UPSCb-common: repository containing functions and script templates
 
 
-##Set up
+## Set up
 - ln -s /mnt/picea/projects/spruce/vhurry/drought-stress-roots/preprosessed data/
 - ln -s /mnt/picea/storage/reference/Picea-abies/v2.0/ reference/
 - ln -s /mnt/picea/projects/singularity singularity/
 - ln -s /mnt/picea/projects/spruce/vhurry/drought-stress-roots/preprosessed/results .
-
-

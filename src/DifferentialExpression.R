@@ -255,7 +255,7 @@ extractEnrichmentResults <- function(enrichment,task="go",
                             MF="Molecular Function")
                 suppressWarnings(tryCatch({plotEnrichedTreemap(enrichment,enrichment=task,
                                                                namespace=ns,
-                                                               de=de,title=paste(default_prefix,titles[ns]))},
+                                                               de=de,title=titles[ns])},
                                           error = function(e) {
                                               message(paste("Treemap plot failed for",ns, 
                                                             "because of:",e))
@@ -325,7 +325,9 @@ resultsNames(dds)
 #' ```{r contrast, echo=FALSE,eval=FALSE}
 #' Evaluate the different contrasts. The 80% water content in the soil is our control.
 #' ```
-
+#' 
+#' 
+#' 
 #' ```{r different contrasts, echo=TRUE,eval=FALSE}
 #' ### Contrast 60 vs 80
 #' contrast_60_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_60._vs_80.", labels = dds$Level, default_prefix="DE-60vs80")
@@ -347,14 +349,15 @@ resultsNames(dds)
 
 #' ```
 
-#' ## Contrast C2d vs control
-contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' ### Show the heatmap just for the contrast we are interested in (C2d vs control)
-contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80")
+#' ## Contrast C2d vs 80
+contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", labels = dds$Level, default_prefix="DE-C2dvs80-all")
 
-#' ### Change the value of the log2fc to remove bias due to the different amount of gene expressed in the two conditions 
-contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-lfc2", lfc=2)
+#' ### Show the heatmap just for the constrast we are interested in (C2d vs control)
+contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-all")
+
+#' #### Change the value of the log2fc to remove bias due to the different amount of gene expressed in the two conditions
+contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-all-lfc2", lfc=2)
 
 
 #' ## Gene Ontology enrichment

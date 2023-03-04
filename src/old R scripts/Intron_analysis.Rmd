@@ -1,0 +1,733 @@
+---
+title: "Analysis of short and long transcripts"
+author: "Emanuela Damieto"
+date: "2022-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(ggtree)
+library(ggpubr)
+library(rstatix)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(plyranges)
+library(stringr)
+library(rtracklayer)
+library(eulerr)
+```
+
+## Data import 
+Import the annotation file and retrieve the ID of the transcript with long and short introns
+
+```{r import annotation file and retrieve long and short transcript ID}
+#spruce <- read.table(gzfile(here("reference/gff3/agat_renamed_with_pos_short_removed_eggnog_added.gff.gz")), sep = "\t", quote="")
+pruce <- read.table(gzfile(here("reference/gff3/Picab02_protein_coding.gff3.gz")), sep = "\t", quote="")
+
+#Add the header
+header <- c("seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes")
+colnames(spruce) <- header
+
+
+#Subset the dataframe to retrieve the information that we want
+genes <- subset(spruce, type=="gene")
+introns <- subset(spruce, type=="intron")  
+mrna <- subset(spruce, type=="mRNA")
+cds <- subset(spruce, type=="CDS")
+
+# write_gff3(cds,here("data/gff3/cds.gff3"))
+# write_gff3(introns,here("data/gff3/introns.gff3"))
+
+parent <- sub(".*=","",introns$attributes)
+introns$parent <- parent
+introns$length <- introns$end-introns$start+1
+
+introns$counts <- 1
+
+#create a new dataframe, group by parent
+df_introns_in_trascr <- introns %>% group_by(parent)
+
+#summarize
+df_introns_in_trascr <- df_introns_in_trascr %>% summarise(
+  counts= sum(counts),
+  seqid=unique(seqid),
+  length=sum(length),
+  parent=unique(parent)
+)
+
+#set the threshold of log intron length to 4 and retrieve parent ID of long and short transcripts
+long_introns <- df_introns_in_trascr %>% filter(log10(length)>=4)
+short_introns <- df_introns_in_trascr %>% filter(log10(length)<4)
+long_introns_id <- long_introns$parent
+short_introns_id <- short_introns$parent
+
+```
+
+## Data analysis
+### Annotation file 
+1. Compare the cumulative length of introns in transcripts with long and short introns (or compare the length of introns in transcripts with long and short cumulative intron length)
+```{r Boxplot short and long introns, warning=FALSE}
+#comparison intron length in short vs long introns 
+mrna <- mrna %>% separate(attributes, c("ID", "Parent", "Name"), ";") %>% mutate (ID= sub("ID=","", ID), Parent= sub("Parent=","",Parent), Name= sub("Name=","",Name))
+mrna_length <- mrna$end-mrna$start+1
+mrna$mrna_length <- mrna_length
+
+mrna_id_length <- mrna %>% select(ID, mrna_length)
+short_introns_mrna <- short_introns %>% left_join(mrna_id_length, by= c("parent"="ID"), suffix=c("intron", "mRNA"))
+long_introns_mrna <- long_introns %>% left_join(mrna_id_length, by= c("parent"="ID"), suffix=c("intron", "mRNA"))
+
+#Boxplot of the two groups
+# boxplot(list(long_introns=log10(long_introns_mrna$length), short_introns=log10(short_introns_mrna$length)), ylab="log intron length", main="Boxplot of cumulative intron length", col="bisque")
+# 
+# boxplot_long <- ggplot(long_introns_mrna, aes(log10(length)))+
+#   geom_boxplot(fill="bisque")+
+#   coord_flip()+
+#   labs(y="log 10 length of introns", title="Boxplot of long introns")
+# 
+# boxplot_short <- ggplot(short_introns_mrna, aes(log10(length)))+
+#   geom_boxplot(fill="bisque")+
+#   coord_flip()+
+#   labs(y="log 10 length of introns", title="Boxplot of short introns")
+# 
+# multiplot(boxplot_long, boxplot_short, ncol=2)
+
+#Merge the long and short dataset
+long_introns_mrna$type <- "long"
+short_introns_mrna$type <- "short"
+
+introns_mrna <- bind_rows(long_introns_mrna, short_introns_mrna)
+
+#Use ggpubr package to plot the boxplot
+ggboxplot(introns_mrna, x="type", y="length", yscale="log10", color="type", ylim=c(1,10000000), title="Boxplot of log cumulative intron length of transcript\nwith long and short introns")
+```
+
+* Perform a statistical test on the two groups to see if the difference is significant 
+```{r t-test short vs long introns, echo=FALSE}
+#Check the assumption of the t-test
+#1. independence: can we consider our groups independent?
+#2. they follow a normal distribution
+
+
+#CHECK THE ASSUMPTION OF THE INDEPENDENT SAMPLES T-TEST 
+#summary statistics
+#introns_mrna %>% group_by(type) %>% get_summary_stats(length, type="mean_sd")
+#very different mean and sd (square root of the variance) -> since the variance is difference we cannot use the Student's t-test
+
+#visualization
+#ggboxplot(introns_mrna, x="type", y="length", ylab="Intron length", xlab="Type", add="jitter")
+
+#Preliminary tests and assumptions 
+#1. Independence of the observations -> each gene should belong to only one group -> TRUE
+#2. No significant outliers
+# outliers <- introns_mrna %>% 
+#   group_by(type) %>% 
+#   identify_outliers(length)
+# 
+# extreme_outliers <- outliers %>% filter(is.extreme==TRUE)
+#Should I remove them? 972 out of 147588 -> it's a very small fraction 
+
+#3. Normality of the data for each group -> compute Shapiro test (KS test since it has no size limit)
+# gghistogram(introns_mrna, x="length",add="mean", color="type", fill="type", palette = c("#00AFBB", "#E7B800"), rug=TRUE)
+# ggqqplot(introns_mrna, x="length", facet.by = "type", add="qqline", color="type", palette = c("#00AFBB", "#E7B800"))
+
+#Not normally distributed
+# norm_long <- rnorm(84455, mean=164546.332, sd=131363.576)
+# norm_short <- rnorm(63133, mean=1759.762, sd=2133.828) 
+# par(mfrow=c(1,2))
+# qqnorm(long_introns_mrna$length)
+# #should be a straight line (although the ends of the Q-Q plot often start to deviate from the straight line)
+# qqnorm(short_introns_mrna$length)
+# 
+# plot(density(norm_long))
+# plot(density(long_introns_mrna$length), col="red") #not a bell shape
+# plot(density(short_introns_mrna$length), col="red") #not a bell shape
+# 
+# 
+# ks.test(unique(long_introns_mrna$length), y="pnorm",alternative='two.sided')
+# #p-value less tha 0.05 so the data are not normally distributed 
+# ks.test(unique(short_introns_mrna$length), y="pnorm", alternative='two.sided')
+#same as before 
+#NORMALITY CHECK FAILED
+
+#DATA TRANSFORMATION
+#Not normal -> transform the data in log scale
+# introns_mrna$log_length <- log10(introns_mrna$length)
+# #Check the assumption
+# #1 Independence of obs -> respected
+# #2 No significant outliers 
+# introns_mrna %>% 
+#   group_by(type) %>% 
+#   identify_outliers(log_length) %>%
+#   filter(is.extreme==TRUE)
+
+#RESPECTED 
+
+#3 Normality of the data for each group
+# gghistogram(introns_mrna, x="log_length",add="mean", color="type", fill="type", palette = c("#00AFBB", "#E7B800"), rug=TRUE)
+# ggqqplot(introns_mrna, x="log_length", facet.by = "type", add="qqline", color="type", palette = c("#00AFBB", "#E7B800"))
+
+#Not normal -> we cannot used t-test since the assumptions are not respected
+#T-test
+# p <- ggboxplot(introns_mrna, x="type", y="length", color="type", ylim=c(1,1500000))
+# p + stat_compare_means(method="t.test", label.y=1500000) 
+# 
+# 
+# t.test(length~type, data=introns_mrna)
+```
+
+
+```{r wilcoxon test short vs long introns}
+#statistics summary of the data
+introns_mrna %>% group_by(type) %>% get_summary_stats(length, type="mean_sd")
+
+#Try non parametric test (Wilcoxon)
+p <- ggboxplot(introns_mrna, x="type", y="length", color="type", ylim=c(1,1500000), title="Boxplot of cumulative intron length of transcript with long and short introns", ggtheme=theme_bw())
+p + stat_compare_means(label.y=1500000) 
+
+
+#Parametric test on log length
+introns_mrna$log_length <- log10(introns_mrna$length)
+q <- ggboxplot(introns_mrna, x="type", y="log_length", color="type", title="Boxplot of log cumulative intron length of transcript with long and short introns", ggtheme=theme_bw())
+q + stat_compare_means() 
+
+#Wilcoxon test on log length of introns
+#introns_mrna %>% wilcox_test(log_length~type)
+#p-value <0.05 so the mean between the two groups is different 
+
+```
+
+
+2. Compare the cumulative length of CDS in transcript with long and short introns and perform a statistical test on the two groups to see if the difference is significant 
+```{r test long vs short CDS, message=FALSE, warning=FALSE}
+#Create cds dataset
+parent_cds <- sub(".*=","",cds$attributes)
+cds$parent <- parent_cds
+cds$counts <-1
+cds$length <- cds$end-cds$start+1
+
+#group by parent
+df_cds <- cds %>% group_by(parent)
+
+#summarize
+df_cds <- df_cds %>% summarise(
+  counts= sum(counts),
+  seqid=unique(seqid),
+  length=sum(length),
+  parent=unique(parent)
+)
+
+short_cds_mrna <- df_cds %>% filter(parent %in% short_introns_id)
+long_cds_mrna <- df_cds %>% filter(parent %in% long_introns_id)
+
+#Merge the long and short dataset
+long_cds_mrna$type <- "long"
+short_cds_mrna$type <- "short"
+
+cds_mrna <- bind_rows(long_cds_mrna, short_cds_mrna)
+
+#Try non parametric test (Wilcoxon)
+cds_normal <- ggboxplot(cds_mrna, x="type", y="length", color="type", title="Boxplot of CDS length of transcript with long and short introns", ggtheme=theme_bw(), notch=TRUE, ylab="cumulative intron length")
+cds_normal + stat_compare_means() 
+
+cds_normal <- ggviolin(cds_mrna, x="type", y="length", color="type", title="Violin plot of CDS length of transcript with long and short introns", ggtheme=theme_bw(), fill="type")
+cds_normal + stat_compare_means() 
+
+
+#Non parametric test on log-scale data
+cds_mrna$log_length <- log10(cds_mrna$length)
+cds_log <- ggboxplot(cds_mrna, x="type", y="log_length", color="type", title="Boxplot of log CDS length of transcript with long and short introns", ggtheme=theme_bw(), notch=TRUE)
+cds_log + stat_compare_means() 
+
+cds_log <- ggviolin(cds_mrna, x="type", y="log_length", color="type", title="Violin plot of log CDS length of transcript with long and short introns", ggtheme=theme_bw(), fill="type")
+cds_log + stat_compare_means()
+
+```
+
+
+### Expression file
+* Import the expression file (vst file) and extract the columns of interest (80% and c2d samples) 
+```{r import expression file and select the column of interest, echo=FALSE}
+#Do the conversion mRNA -> gene ID with tx2 file 
+#tx2gene <- suppressMessages(read_delim(here("reference/annotation/tx2gene_update.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+tx2gene <- suppressMessages(read_delim(here("reference/annotation/Picab02_tx2gene.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+tx2gene_long <- tx2gene %>% filter(TXID %in% long_introns_id)
+tx2gene_short <- tx2gene %>% filter(TXID %in% short_introns_id)
+
+dim(tx2gene_long)[1]+dim(tx2gene_short)[1]
+#transcript without introns are discarded
+
+#check that the intersection is empty
+intersect(tx2gene_long,tx2gene_short)
+
+
+#Import the vst file 
+#load(here("data/analysis/DE/vst-aware.rda"))
+load(here("data/analysis/DE/vst-aware_lengthScaledTPM.rda"))
+samples <- read_csv(here("data/drought_roots.csv"),
+                      col_types=cols(.default=col_factor()))
+
+colnames(vst) <- samples$SampleName
+vst <- as_tibble(vst, rownames= "Gene") 
+
+#Retrieve just the samples that we are interested in
+vst_80_c2d <- vst %>% select(starts_with(c("Gene","80%","C48")))
+head(vst_80_c2d)
+
+# extract all rows that contain at least one 0 in a column.
+#vst_80_c2d_clean <- vst_80_c2d %>% filter_at(vars(starts_with(c("80%","C48"))), any_vars(. != 0))
+
+```
+
+
+
+```{r expressed genes in the two conditions}
+#merge of biological replicates -> 1 column for 80 and 1 for C2d (mean of expression values among samples)
+vst_all_mean <- vst_80_c2d %>% transmute(Gene= Gene, "80%" = rowMeans(vst_80_c2d[,2:5]), C2d=rowMeans(vst_80_c2d[,6:8]))
+#43909
+
+#there are 10 274 genes that are not expressed in C2d
+no_expr_c2d <- filter(vst_all_mean, C2d==0) 
+#6566 of these are not expressed also in the control
+no_expr_both <- filter(vst_all_mean, C2d==0 & `80%`==0)
+#there are 8264 genes that are not expressed in the control 
+no_expr_cnt <- filter(vst_all_mean, `80%`==0) 
+
+
+#make a Euler plot
+#In a Venn diagram every part of the circle is independent!
+#not_expr_C2d=10274-6566=3708, not_expr_CNT=8364-6566=1798
+euler_expr_genes <- euler(c(not_expr_C2D = 3708, not_expr_CNT = 1798, "not_expr_C2D&not_expr_CNT" = 6566))
+plot(euler_expr_genes, quantities=TRUE, labels=list(font=4))
+
+
+#keep the ones that are expressed in C2d 
+not_common_genes <- union(no_expr_c2d, no_expr_cnt) #10274+8264-6566
+expr_common <- vst_all_mean %>% filter(!Gene %in% not_common_genes$Gene)  #43909-(10274+8264-6566)
+common_genes <- expr_common$Gene
+write.table(common_genes, here("data/analysis/common_genes.txt"))
+
+
+#keep the information to intersect with genes with long/short introns 
+
+```
+
+
+* Comparison of gene expression between different conditions (short vs long C2d, short vs long C2d, long 80% vs C2d ratio, short 80% vs C2d ratio)
+```{r comparison of the expression between different conditions}
+#intersect the list of gene with short and long introns with the vst file (normalized expression file)
+vst_long <- vst_80_c2d %>% filter(Gene %in% tx2gene_long$GENE)
+vst_short <- vst_80_c2d %>% filter(Gene %in% tx2gene_short$GENE)
+
+#merge of biological replicates -> 1 column for 80 and 1 for C2d (mean of expression values among samples)
+vst_long_mean <- vst_long %>% transmute(Gene= Gene, "80%" = rowMeans(vst_long[,2:5]), C2d=rowMeans(vst_long[,6:8]))
+vst_short_mean <- vst_short %>% transmute(Gene= Gene, "80%" = rowMeans(vst_short[,2:5]), C2d=rowMeans(vst_short[,6:8]))
+
+#COMPARE LONG VS SHORT IN 80 AND C2D 
+vst_long_mean$type <- "long"
+vst_short_mean$type <- "short"
+
+vst_mean <- bind_rows(vst_long_mean, vst_short_mean)
+
+c2d <- ggboxplot(vst_mean, x="type", y="C2d", main="Expression of long and short\ntranscripts in C2d", ylab="Normalized gene expression", color = "type", palette =c("#00AFBB", "#E7B800")) + 
+  stat_compare_means(label.y=15)
+
+vst_mean <- vst_mean %>% rename("Control"="80%")
+
+cnt_80 <- ggboxplot(vst_mean, x="type", y="Control", main="Expression of long and short\ntranscripts in 80%", ylab="Normalized gene expression", color = "type", palette =c("#00AFBB", "#E7B800"))+   stat_compare_means(label.y=15)
+
+cnt_80 + c2d
+
+vst_mean %>% wilcox_test(C2d~type)
+vst_mean %>% wilcox_test(Control~type)
+
+vst_mean <- vst_mean[vst_mean$Control+vst_mean$C2d >0,]
+
+# COMPARE 80 VS C2D FOR LONG AND SHORT INTRONS
+# compute the ratio of expression and create a new column -> easier to compare the expression of the same gene in two conditions
+#vst_mean$ratio_C2d_80 <- vst_mean$C2d / vst_mean$`80%`
+#vst_mean$log_ratio_C2d_80 <- log1p(vst_mean$ratio_C2d_80)
+#log(A/B)= log(A)-log(B)
+vst_mean$log_ratio_C2d_80 <- vst_mean$C2d - vst_mean$Control
+ratio <- ggboxplot(vst_mean, x="type", y="log_ratio_C2d_80", main="Ratio of the expression of long and short\ntranscripts in C2d vs 80%", 
+                   ylab="Normalized gene expression ratio", color = "type", palette =c("#00AFBB", "#E7B800"), ylim=c(-6,10))
+ratio + stat_compare_means(label.y=10)
+
+#COMPARE DEG AND NOT DEG 80 VS C2D FOR LONG AND SHORT INTRONS
+deg <- read.csv(here("data/analysis/DE/DE-C2dvs80-genes.csv"))
+deg <- deg %>% rename(Gene = X)
+
+vst_deg <- vst_mean %>% filter(Gene %in% deg$Gene)
+ratio <- ggboxplot(vst_deg, x="type", y="log_ratio_C2d_80", main="Ratio of the expression of long and short\ntranscripts of DEG in C2d vs 80%", 
+                   ylab="Normalized gene expression ratio", color = "type", palette =c("#00AFBB", "#E7B800"), ylim=c(-6,10))
+ratio + stat_compare_means(label.y=10)
+
+
+vst_not_deg <- vst_mean %>% filter(!Gene %in% deg$Gene)
+ratio <- ggboxplot(vst_not_deg, x="type", y="log_ratio_C2d_80", main="Ratio of the expression of long and short\ntranscripts of not DEG in C2d vs 80%", 
+                   ylab="Normalized gene expression ratio", color = "type", palette =c("#00AFBB", "#E7B800"), ylim=c(-6,10))
+ratio + stat_compare_means(label.y=10)
+
+```
+
+
+### Repeats 
+1. Analysis of repeats in introns
+```{r repeats in introns, echo=FALSE}
+repeats <- read.table(here("results/BedToolsIntersect/intersection_repeats_introns_ovl.tsv"), sep = "\t")
+head_repeats <- c(paste0(header,"_repeats"),paste0(header,"_intron"), "overlap")
+colnames(repeats) <- head_repeats
+head(repeats)
+
+#keep just the type of TE
+repeats$attributes_repeats <- sub(".*:","",repeats$attributes_repeats)
+repeats$attributes_repeats <- sub(" .*","",repeats$attributes_repeats)
+
+#keep just the parent ID of the intron so the transcript ID
+repeats$attributes_intron <- sub(".*Parent%3d","",repeats$attributes_intron)
+repeats$attributes_intron <- sub(";.*","",repeats$attributes_intron)
+
+#retrieve repeats
+repeats_long <- repeats %>% filter(attributes_intron %in% long_introns_id)
+repeats_short <- repeats %>% filter(attributes_intron %in% short_introns_id)
+
+dim(repeats_long)[1]/dim(repeats)[1]
+
+repeats_long_type <- unique(repeats_long$attributes_repeats) #11245
+repeats_short_type <- unique(repeats_short$attributes_repeats) #2991
+length(intersect(repeats_long_type, repeats_short_type)) #2828
+
+l <- ggplot(repeats_long, aes(overlap))+
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap length in\ntranscripts with long introns")
+
+s <- ggplot(repeats_short, aes(overlap))+
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap length in\ntranscripts with short introns")
+
+l+s 
+
+#Keep unique repeats 
+repeats_unique <- repeats %>% distinct(seqid_repeats,start_repeats,end_repeats,.keep_all = TRUE) %>%        mutate(repeat_category=ifelse(grepl("TE",attributes_repeats),"TE",ifelse(grepl("line",attributes_repeats),"LINE",ifelse(grepl(')n',attributes_repeats),"LowComplexity","Others"))))
+
+#retrieve repeats
+repeats_long_unique <- repeats_unique %>% filter(attributes_intron %in% long_introns_id)
+repeats_short_unique <- repeats_unique %>% filter(attributes_intron %in% short_introns_id)
+
+l <- ggplot(repeats_long_unique, aes(overlap))+
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap length in\ntranscripts with long introns")
+
+s <- ggplot(repeats_short_unique, aes(overlap))+
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap length in\ntranscripts with short introns")
+
+l+s 
+
+```
+
+
+2. Analysis of repeats in CDS
+```{r repeats in CDS}
+repeats_cds <- read.table(here("results/BedToolsIntersect/intersection_repeats_cds_ovl.tsv"), sep = "\t")
+head_repeats_cds <- c(paste0(header,"_repeats"),paste0(header,"_cds"), "overlap")
+colnames(repeats_cds) <- head_repeats_cds
+head(repeats_cds)
+
+
+#keep just the type of TE
+repeats_cds$attributes_repeats <- sub(".*:","",repeats_cds$attributes_repeats)
+repeats_cds$attributes_repeats <- sub(" .*","",repeats_cds$attributes_repeats)
+
+#keep just the parent ID of the intron so the transcript ID
+repeats_cds$attributes_cds <- sub(".*Parent%3d","",repeats_cds$attributes_cds)
+repeats_cds$attributes_cds <- sub(";.*","",repeats_cds$attributes_cds)
+
+#retrieve repeats
+repeats_cds_long <- repeats_cds %>% filter(attributes_cds %in% long_introns_id)
+repeats_cds_short <- repeats_cds %>% filter(attributes_cds %in% short_introns_id)
+
+dim(repeats_cds_long)[1]/dim(repeats_cds)[1]
+
+
+l <- ggplot(repeats_cds_long, aes(overlap))+
+  geom_boxplot()+
+  xlim(0,1600)+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap\nlength CDS/repeats in\ntranscripts with long introns")
+
+s <- ggplot(repeats_cds_short, aes(overlap))+
+  geom_boxplot()+
+  xlim(0,1600)+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap\nlength CDS/repeats in\ntranscripts with short introns")
+
+l+s 
+
+#Keep unique repeats 
+repeats_unique_cds <- repeats_cds %>% distinct(seqid_repeats,start_repeats,end_repeats,.keep_all = TRUE) %>%        mutate(repeat_category=ifelse(grepl("TE",attributes_repeats),"TE",ifelse(grepl("line",attributes_repeats),"LINE",ifelse(grepl(')n',attributes_repeats),"LowComplexity","Others"))))
+
+#retrieve repeats
+repeats_cds_long_unique <- repeats_unique_cds %>% filter(attributes_cds %in% long_introns_id)
+repeats_cds_short_unique <- repeats_unique_cds %>% filter(attributes_cds %in% short_introns_id)
+
+
+l <- ggplot(repeats_cds_long_unique, aes(overlap))+
+  geom_boxplot()+
+  xlim(0,1600)+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap\nlength CDS/repeats in\ntranscripts with long introns")
+
+s <- ggplot(repeats_cds_short_unique, aes(overlap))+
+  geom_boxplot()+
+  xlim(0,1600)+
+  coord_flip()+
+  theme_classic()+
+  labs(title="Boxplot of the overlap\nlength CDS/repeats in\ntranscripts with short introns")
+
+l+s 
+
+```
+### Perform a statistical test 
+1. Perform a Fisher test on the number of genes
+```{r DEG in C2d vs 80}
+#Analysis of DEG -> enrichment of DEG with long/short introns in C2d and 80 (as background consider all genes that pass the test not all genes in the genome) ???
+#deg <- read.csv(here("data/analysis/DE/DE-C2dvs80-genes.csv"))
+deg <- read.csv(here("data/analysis/DE/DE-C2dvs80-lfc2-genes.csv"))
+deg <- deg %>% rename(Gene = X)
+
+
+deg_long <- deg %>% filter(Gene %in% tx2gene_long$GENE)
+deg_short <- deg %>% filter(Gene %in% tx2gene_short$GENE)
+
+length(unique(tx2gene_long$GENE)) #13769
+length(unique(tx2gene_short$GENE)) #20497
+#if you sum deg_long and deg_short the value is different from deg -> there are deg with no introns!!!!!!!!
+
+#Test that genes with long introns are more likely to be DE in response to drought stress
+#genes with long introns 13769 (unique(tx2gene_long$GENE)), genes with short introns 20497 (unique(tx2gene_short))
+#deg long 4286, deg short 6337
+# not deg long 9483 (13769-4286), not deg short 14160 (20497-6337)
+#with lfc=2 deg long 1208, deg short 3770, not deg long 12561, not deg short 14160
+
+#contingency_table <- matrix(c(4286,6337,9483,14160), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("DE", "not DE")))
+contingency_table <- matrix(c(1208,3770,12561,16727), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("DE", "not DE")))
+fisher.test(contingency_table, simulate.p.value = TRUE)
+
+fisher_test(contingency_table, detailed= TRUE)
+
+#ggballoonplot(contingency_table, fill ="lightblue")
+mosaicplot(contingency_table, color=TRUE)
+vcd::assoc(contingency_table,shade=TRUE)
+
+```
+2. Perform a Fisher test on the number of upregulated differential expressed genes
+```{r up DEG in C2d vs 80}
+#upregulated genes in C2d
+deg_up <- deg %>% filter(log2FoldChange>0) #4788
+#with log2fc=2 1591
+
+deg_up_long <- deg_up %>% filter(Gene %in% tx2gene_long$GENE) #2585
+#with log2fc=2 404
+deg_up_short <- deg_up %>% filter(Gene %in% tx2gene_short$GENE) #2222
+#with log2fc=2 896
+
+#Test that genes with long introns are more likely to be upregulated in response to drought stress
+#genes with long introns 13769 (unique(tx2gene_long$GENE)), genes with short introns 20497 (unique(tx2gene_short))
+#up long 2585, up short 2222
+#not up long 11184 (13769-2585), not up short 18275 (20497-2222)
+#with log2fc=2, up long 404, up short 896, not up long 13365, not up short 19601
+
+#contingency_table_up <- matrix(c(2585,2222,11184,18275), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("up", "not up")))
+contingency_table_up <- matrix(c(404,896,13365,19601), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("up", "not up")))
+fisher.test(contingency_table_up, simulate.p.value = TRUE)
+
+fisher_test(contingency_table_up, detailed= TRUE)
+
+mosaicplot(contingency_table_up, color=TRUE)
+vcd::assoc(contingency_table_up,shade=TRUE)
+
+```
+
+3. Perform a Fisher test on the number of downregulated differential expressed genes
+```{r down DEG in C2d vs 80}
+deg_down <- deg %>% filter(log2FoldChange<0) #6256
+#with log2fc=2 4165
+
+deg_down_long <- deg_down %>% filter(Gene %in% tx2gene_long$GENE) #1701
+#with log2fc=804 
+deg_down_short <- deg_down %>% filter(Gene %in% tx2gene_short$GENE) #4116
+#with log2fc=2874 
+
+#Test that genes with long introns are more likely to be upregulated in response to drought stress
+#genes with long introns 13769 (unique(tx2gene_long$GENE)), genes with short introns 20497 (unique(tx2gene_short))
+#down long 1701, down short 4116
+#not down long 12068 (13769-1701), not down short 16381 (20497-4116)
+#with log2fc=2, down long 804, down short 2874, not down long 12965, not down short 17623
+
+#contingency_table_down <- matrix(c(1701,4116,12068,16381), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("down", "not down")))
+contingency_table_down <- matrix(c(804,2874,12965,17623), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("down", "not down")))
+fisher.test(contingency_table_down, simulate.p.value = TRUE)
+
+fisher_test(contingency_table_down, detailed= TRUE)
+vcd::assoc(contingency_table_down,shade=TRUE)
+
+mosaicplot(contingency_table_down, color=TRUE)
+```
+
+4. Perform a Fisher test on the number of differential expressed genes
+```{r DEG in short and long}
+
+#contingency_table_deg <- matrix(c(2585,2222, 1701,4116), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"),c("up", "down")))
+contingency_table_deg <- matrix(c(404,896,804, 2874), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"),c("up", "down")))
+fisher.test(contingency_table_deg, simulate.p.value = TRUE)
+
+fisher_test(contingency_table_deg, detailed= TRUE)
+vcd::assoc(contingency_table_deg,shade=TRUE)
+
+mosaicplot(contingency_table_deg, color=TRUE)
+```
+### Look at the distribution of genes with long intron across the genome
+```{r distribution of introns across the genome}
+#Transform the y axis in log scale
+ggenes <- GRanges(genes)
+gintrons <- GRanges(introns)
+overlap <- findOverlaps(gintrons, ggenes, type="within") #910198 overlap
+
+
+head(overlap, 20)
+intr_in_genes <- as.data.frame(table(overlap@to))
+
+intr_in_genes <- as.data.frame(t(apply(intr_in_genes,1, as.numeric)))
+colnames(intr_in_genes) <- c("Gene", "Num_introns")
+
+max(intr_in_genes$Num_introns)
+#2274
+which.max(intr_in_genes$Num_introns)
+#26098
+intr_in_genes[which.max(intr_in_genes$Num_introns),]
+#gene 38160	 with 2274 introns
+ggenes[38160,]
+
+
+#CREA UN DF WITH GENE, INTRON TOTAL LENGTH, CHR
+df_within <- data.frame(Gene=ovl@to, Intron=ovl@from, Intron_length=gintrons@ranges@width[ovl@from], chr= as.character(seqnames(ggenes[subjectHits(ovl),])))
+
+#Group By gene
+df_grouped_within <- df_within %>% group_by(Gene)
+
+#summarise by sum
+df_new_within <- df_grouped_within %>% summarise(
+  Intron_length=sum(Intron_length),
+  chr=unique(chr)
+)
+
+df_chr_genes <- df_new_within %>% filter(str_detect(chr,  regex(paste0("^PA_chr[0-9]{2}$"))))
+ggplot(df_chr_genes, aes(chr, log10(Intron_length)))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length in the chromosomes", x="Chr", y="log of cumulative intron length")+
+   theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))
+  
+```
+
+```{r distribution of genes with long introns in the genome}
+#summarise by sum
+df_new_within_long <- df_new_within %>% filter(log10(Intron_length)>=4)
+
+df_chr_genes_long <- df_new_within_long %>% filter(str_detect(chr,  regex(paste0("^PA_chr[0-9]{2}$"))))
+ggplot(df_chr_genes_long, aes(chr, log10(Intron_length)))+
+  geom_boxplot()+
+  labs(title="Boxplot of cumulative intron length of genes with long\nintrons in the chromosomes", x="Chr", y="log of cumulative intron length")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))
+
+ggplot(df_chr_genes_long, aes(chr))+
+  geom_histogram(stat="count")+
+  labs(title="Histogram of the number of genes with long introns in the chromosomes", x="Chr", y="Counts")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))
+
+# long_geneID <- unique(tx2gene_long$GENE)
+# genes$attributes <- sub(".*=","",genes$attributes)
+# 
+# genes_long_introns <- genes %>% filter(attributes %in% long_geneID)
+# genes_long_introns <- genes_long_introns %>% filter(str_detect(seqid,  regex(paste0("^PA_chr[0-9]{2}$"))))
+# 
+# ggplot(genes_long_introns, aes(seqid))+
+#   geom_histogram(stat="count")+
+#   labs(title="Histogram of the number of genes with long introns in the chromosomes", x="Chr", y="Counts")+
+#   theme(axis.text.x = element_text(angle = 90))
+
+```
+
+* Consider the first intron length 
+```{r genes with long introns considering the first intron length}
+#dataset with the representative transcript per gene 
+#data processing
+#mRNA_repre <- read.table(here("reference/fasta/Picab02_protein_coding_representative_mRNA.fa.gz"), sep = "\t", quote="")
+# mRNA_repre_header <- as.data.frame(mRNA_repre[grep(">", mRNA_repre$V1),])
+# colnames(mRNA_repre_header) <- "header"
+# mRNA_repre_header <- as.data.frame(sub(">","", mRNA_repre_header$header))
+# colnames(mRNA_repre_header) <- "header"
+# mRNA_repre_header <- as.data.frame(sub("gene=","", mRNA_repre_header$header))
+# colnames(mRNA_repre_header) <- "header"
+# mRNA_repre_header <- as.data.frame(sub("seq_id=","", mRNA_repre_header$header))
+# colnames(mRNA_repre_header) <- "header"
+# 
+# transcr_repre <- as.data.frame(str_split_fixed(mRNA_repre_header$header, " ", 4))
+# colnames(transcr_repre) <- c("mrna", "gene", "seq_id", "type")
+# transcr_repre <- transcr_repre[,1:3]
+# 
+# #retrieve just the most representative transcript per gene
+# transcr_repre_introns <- introns %>% filter(parent %in% transcr_repre$mrna)
+# #split the dataset in plus and minus
+# introns_plus <- transcr_repre_introns %>% filter(strand=="+")
+# introns_minus <- transcr_repre_introns %>% filter(strand=="-")  -> this is wrong!!!
+# #retrieve the longest intron per transcript
+# longest_intron_plus <- introns_plus %>% filter(!duplicated(parent))
+# longest_intron_minus <-  introns_minus %>% filter(!duplicated(parent))
+# longest_intron <- bind_rows(longest_intron_plus, longest_intron_minus)
+#  
+# ggplot(longest_intron, aes(length))+
+#   geom_histogram(binwidth=0.2)+
+#   scale_x_log10()+
+#   theme_classic()+
+#   labs(title="Histogram of in")
+# 
+# hist(log10(longest_intron$length))
+
+mRNA_repre <- read.table(here("reference/gff3/Picab02_protein_coding_representative_mRNA.gff3.gz"), sep = "\t", quote="")
+colnames(mRNA_repre) <-header
+mRNA_repre_intron <- subset(mRNA_repre, type=="intron")
+
+parents <- sub(".*=","",mRNA_repre_intron$attributes)
+mRNA_repre_intron$parent <- parents
+mRNA_repre_intron$length <- mRNA_repre_intron$end-mRNA_repre_intron$start+1
+
+mRNA_repre_intron_plus <- subset(mRNA_repre_intron, strand=="+")
+mRNA_repre_intron_minus <- subset(mRNA_repre_intron, strand=="-")
+
+#retrieve the first intron (for the minus the first intron is the last because the position in the chromosome is increasing but the stran is opposite so the last is the first one)
+first_intron_plus <- mRNA_repre_intron_plus %>% filter(!duplicated(parent))
+first_intron_minus <- mRNA_repre_intron_minus %>% filter(!duplicated(parent, fromLast=TRUE))
+
+first_intron <- bind_rows(first_intron_plus, first_intron_minus)
+
+
+```
+
+

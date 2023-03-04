@@ -261,7 +261,7 @@ extractEnrichmentResults <- function(enrichment,task="go",
                             MF="Molecular Function")
                 suppressWarnings(tryCatch({plotEnrichedTreemap(enrichment,enrichment=task,
                                                                namespace=ns,
-                                                               de=de,title=paste(default_prefix,titles[ns]))},
+                                                               de=de,title=titles[ns])},
                                           error = function(e) {
                                               message(paste("Treemap plot failed for",ns, 
                                                             "because of:",e))
@@ -348,38 +348,50 @@ resultsNames(dds)
 #' Evaluate the contrast C2d vs 80, the 80% water content in the soil is our control.
 #' ```
 
-#' ```{r different contrasts, echo=TRUE,eval=FALSE}
-#' ### Contrast 60 vs 80
-#' contrast_60_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_60._vs_80.", labels = dds$Level, default_prefix="DE-60vs80")
-#' 
-#' ### Contrast 40 vs 80
-#' contrast_40_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_40._vs_80.", labels = dds$Level, default_prefix="DE-40vs80")
+#' ## Contrast 60 vs 80
+contrast_60_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_60._vs_80.", sample_sel = dds$Level %in% c("80%","60%"), labels = dds$Level, default_prefix="DE-60vs80")
 
-#' ### Contrast 30 vs 80
-#' contrast_30_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30._vs_80.", labels = dds$Level, default_prefix="DE-30vs80")
+#' ## Contrast 40 vs 80
+contrast_40_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_40._vs_80.", sample_sel = dds$Level %in% c("80%","40%"),labels = dds$Level, default_prefix="DE-40vs80")
 
-#' ### Contrast 307d vs 80
-#' contrast_307d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30.7d_vs_80.", labels = dds$Level, default_prefix="DE-307dvs80")
+#' ## Contrast 30 vs 80
+contrast_30_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30._vs_80.", sample_sel = dds$Level %in% c("80%","30%"),labels = dds$Level, default_prefix="DE-30vs80")
 
-#' ### Contrast collapse vs 80
-#' contrast_Collapse_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Collapse_vs_80.", labels = dds$Level, default_prefix="DE-collapsevs80")
+#' ## Contrast 307d vs 80
+contrast_307d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_30.7d_vs_80.", sample_sel = dds$Level %in% c("80%","30%7d"),labels = dds$Level, default_prefix="DE-307dvs80")
 
-#' ### Contrast rehydrate vs 80
-#' contrast_Rehydrate_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Rehydrate_vs_80.", labels = dds$Level, default_prefix="DE-Rehydratevs80")
+#' ## Contrast collapse vs 80
+contrast_Collapse_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Collapse_vs_80.", sample_sel = dds$Level %in% c("80%","Collapse"),labels = dds$Level, default_prefix="DE-collapsevs80")
 
-#' ```
+#' ## Contrast C2d vs control
 
-
-#' ## Contrast C2d vs 80
-contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", labels = dds$Level, default_prefix="DE-C2dvs80")
-
-#' ### Show the heatmap just for the constrast we are interested in (C2d vs control)
+#' ### Show the heatmap just for the contrast we are interested in (C2d vs control)
 contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80")
 
-#' #### Change the value of the log2fc to remove bias due to the different amount of gene expressed in the two conditions
-contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-lfc2", lfc=2)
+#' ### Change the value of the log2fc to remove bias due to the different amount of gene expressed in the two conditions 
+contrast_C2d_vs_80_l2fc2 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.", sample_sel = dds$Level %in% c("80%","C2d"), labels = dds$Level, default_prefix="DE-C2dvs80-lfc2", lfc=2)
+
+#' ## Contrast rehydrate vs 80
+contrast_Rehydrate_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_Rehydrate_vs_80.", sample_sel = dds$Level %in% c("80%","Rehydrate"),labels = dds$Level, default_prefix="DE-Rehydratevs80")
 
 
+colors <- c("red", "blue")
+contrasts_name <- c("60_vs_80", "40_vs_80", "30_vs_80", "307d_vs_80",
+               "Collapse_vs_80", "C2d_vs_80", "C2d_vs_80_l2fc2", "Rehydrate_vs_80")
+
+contrasts <- c(contrast_60_vs_80, contrast_40_vs_80, contrast_30_vs_80, contrast_307d_vs_80,
+               contrast_Collapse_vs_80, contrast_C2d_vs_80, contrast_C2d_vs_80_l2fc2, contrast_Rehydrate_vs_80)
+
+matrix_contrast <- matrix(lapply(contrasts[which(names(contrasts) %in% c("up", "dn"))], function(x){length(x)}), nrow = 8, ncol = 2, byrow = TRUE) 
+
+dimnames(matrix_contrast) <- list(contrasts_name,c("up", "down"))
+
+end_point = 0.5 + nrow(matrix_contrast) + nrow(matrix_contrast) - 1
+
+barplot(t(matrix_contrast), main="Number of DEG in different contrasts", ylab="Number of genes", xlab="", xaxt="n", space=1,
+             col=colors, las=2, cex.names = 0.6, cex.axis = 0.8)
+legend("topleft", colnames(matrix_contrast), cex=0.8, fill=colors)
+text(seq(1.5, end_point, by=2), par("usr")[3]-0.25, srt=60, adj=1, xpd=TRUE, labels=paste(rownames(matrix_contrast)), cex=0.7)
 #' ## Venn Diagram
 #' ```{r venn, echo=FALSE,eval=FALSE}
 #' CHANGEME - Here, you typically would have run several contrasts and you want

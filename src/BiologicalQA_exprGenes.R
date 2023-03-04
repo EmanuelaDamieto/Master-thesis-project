@@ -449,6 +449,42 @@ dds <- dds[rownames(dds) %in% expr_genes$Genes,]
 
 save(dds,file=here("data/analysis/salmon/dds_merge_expr_genes.rda"))
 
+#' # Create the vst with counts normalized by the transcript length
+#' ```{r Normalized counts,eval=FALSE,echo=FALSE}
+#' It will needed for some of the downstream analysis. 
+#' Here, we are generating counts from abundances, using the argument countsFromAbundance, 
+#' scaled to library size and the average transcript length, averaged over samples. 
+#' In this way we cannot compared different genes but just different transcripts of the same gene. 
+#'
+#' ```
+txi <- suppressMessages(tximport(files = samples_rep$Filenames,
+                                 type = "salmon",
+                                 tx2gene=tx2gene,
+                                 countsFromAbundance="lengthScaledTPM"))
+counts <- txi$counts
+samples_rep$Filenames <- sub("*_151118_BC852HANXX_P2503_", "_", sub("*_sortmerna_trimmomatic","",basename(dirname(samples_rep$Filenames))))
+colnames(counts) <- samples_rep$Filenames
+counts <- as.data.frame(counts)
+counts <- filter(counts, rownames(counts) %in% expr_genes$Genes)
+
+
+dds <- DESeqDataSetFromTximport(
+  txi=txi,
+  colData = samples_rep,
+  design = ~ Level)
+
+colnames(dds) <- samples_rep$Filenames
+
+dds <- dds[rownames(dds) %in% expr_genes$Genes,]
+
+vsd <- varianceStabilizingTransformation(dds,blind=FALSE)
+vst <- assay(vsd)
+vst <- vst - min(vst)
+
+save(vst,file=here("data/analysis/DE/vst-aware-lengthScaledTPM_exprGenes.rda"))
+write_delim(as.data.frame(vst) %>% rownames_to_column("ID"),
+            here("data/analysis/DE/vst-aware-lengthScaledTPM_exprGenes.tsv"))
+
 #' <hr />
 #' &nbsp;
 #' 

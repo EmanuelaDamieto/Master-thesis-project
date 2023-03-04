@@ -1,0 +1,231 @@
+---
+title: "Analysis of the expression file"
+author: "Emanuela Damieto"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+      fig_width: 9
+      fig_height: 6
+      toc: true
+      number_sections: true
+      toc_depth: 4
+      toc_float:
+        collapsed: TRUE
+        smooth_scroll: TRUE
+      code_folding: hide
+      theme: "flatly"
+      highlight: pygments
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(dplyr)
+library(eulerr)
+library(rstatix)
+library(readr)
+library(ggpubr)
+library(ggtree)
+library(vcd)
+```
+
+
+# Import the expression file
+* Import the expression file (vst file) and extract the columns of interest (80% and c2d samples) 
+
+```{r import expression file and select the column of interest, echo=FALSE}
+#Do the conversion mRNA -> gene ID with tx2 file 
+tx2gene <- suppressMessages(read_delim(here("reference/annotation/Picab02_tx2gene.tsv.gz"), delim="\t", col_names=c("TXID","GENE"), skip=1))
+
+#import the lists of IDs of transcripts with long and short introns
+long_introns_id <- read.table(here("data/analysis/long_introns_ID.txt"), col.names="ID")
+short_introns_id <- read.table(here("data/analysis/short_introns_ID.txt"), col.names = "ID")  
+
+#divide the genes in long and short
+tx2gene_long <- tx2gene %>% filter(TXID %in% long_introns_id$ID)
+tx2gene_short <- tx2gene %>% filter(TXID %in% short_introns_id$ID)
+
+#transcript without introns are discarded
+
+#Import the vst file 
+load(here("data/analysis/DE/vst-aware_lengthScaledTPM.rda"))
+samples <- read_csv(here("data/drought_roots.csv"),
+                      col_types=cols(.default=col_factor()))
+
+colnames(vst) <- samples$SampleName
+vst <- as_tibble(vst, rownames= "Gene") 
+
+#Retrieve just the samples that we are interested in
+vst_80_c2d <- vst %>% select(starts_with(c("Gene","80%","C48")))
+```
+
+# Inspect the number of genes expressed just in one condition
+```{r expressed genes in the two conditions}
+#merge of biological replicates -> 1 column for 80 and 1 for C2d (mean of expression values among samples)
+vst_all_mean <- vst_80_c2d %>% transmute(Gene= Gene, "80%" = rowMeans(vst_80_c2d[,2:5]), C2d=rowMeans(vst_80_c2d[,6:8]))
+
+vst_all_mean <- vst_all_mean %>% mutate(type=ifelse(Gene %in% tx2gene_short$GENE,"short", ifelse(Gene %in% tx2gene_long$GENE,"long", "no introns")))
+print("All genes")
+table(vst_all_mean$type)
+
+vst_expr_cnt <- filter(vst_all_mean, C2d==0 & `80%`!=0)
+print("Expressed in control")
+table(vst_expr_cnt$type)
+
+vst_expr_c2d <- filter(vst_all_mean, C2d!=0 & `80%`==0)
+print("Expressed in c2d")
+table(vst_expr_c2d$type)
+
+#there are 10 275 genes that are not expressed in C2d
+no_expr_c2d <- filter(vst_all_mean, C2d==0) 
+#6566 of these are not expressed also in the control
+no_expr_both <- filter(vst_all_mean, C2d==0 & `80%`==0)
+#there are 8265 genes that are not expressed in the control 
+no_expr_cnt <- filter(vst_all_mean, `80%`==0) 
+
+
+#make a Euler plot
+#In a Venn diagram every part of the circle is independent!
+#not_expr_C2d=10275-6566=3709, not_expr_CNT=8365-6566=1799
+
+plot(euler(c("control" = 3709, "C2d" = 1799, "control&C2d" = 6566), shape = "ellipse"),c("palegreen","plum1"), labels = list(font=1, cex=1), counts=TRUE,ills =list(fill=c(viridis::plasma(n = 3))), alpha = 0.3,  quantities=list(type = c("counts"), font=3, round=2, cex=0.8))
+
+#keep the ones that are expressed in C2d 
+not_common_genes <- union(no_expr_c2d, no_expr_cnt) #10275+8265-6566
+expr_common <- vst_all_mean %>% filter(!Gene %in% not_common_genes$Gene)  #43909-(10275+8265-6566)
+common_genes <- expr_common$Gene
+write.table(common_genes, here("data/analysis/common_genes.txt")) #31935
+```
+
+# Import the expression file with the subset of genes expressed in both conditions
+* Look at the gene expression in control and severe drought stress condition (c2d) taking in consideration the classification of the gene (long introns, short introns, no introns)
+```{r comparison of the expression between cnt vs c2d}
+load(here("data/analysis/DE/vst-aware-lengthScaledTPM_exprGenes.rda"))
+colnames(vst) <- samples$SampleName
+vst <- as_tibble(vst, rownames= "Gene") 
+
+#Retrieve just the samples that we are interested in
+vst_80_c2d <- vst %>% select(starts_with(c("Gene","80%","C48")))
+
+#merge of biological replicates -> 1 column for 80 and 1 for C2d (mean of expression values among samples)
+vst_all_mean <- vst_80_c2d %>% transmute(Gene= Gene, "80%" = rowMeans(vst_80_c2d[,2:5]), C2d=rowMeans(vst_80_c2d[,6:8]))
+
+vst_all_mean <- vst_all_mean %>% rename("Control"="80%")
+
+vst_all_mean <- vst_all_mean %>% mutate(type=ifelse(Gene %in% tx2gene_short$GENE,"short", ifelse(Gene %in% tx2gene_long$GENE,"long", "no introns"))) %>% arrange(desc(Control))
+
+table(vst_all_mean$type)
+
+#plot
+vst_all_mean$type <- factor(vst_all_mean$type,levels=c("long","short","no introns"))
+ggboxplot(vst_all_mean, x="type", y="C2d", main="Expression of long and short\ntranscripts in C2d", ylab="Normalized gene expression", color = "type", notch=TRUE, palette=c("#F8766D","#619CFF","#00BA38")) + 
+stat_compare_means(label.y=15)
+
+ggboxplot(vst_all_mean, x="type", y="Control", main="Expression of long and short\ntranscripts in 80%", ylab="Normalized gene expression", color = "type", notch=TRUE,palette=c("#F8766D","#619CFF","#00BA38"))+   stat_compare_means(label.y=15)
+
+```
+* Look at the ratio in gene expression between control and c2d considering the gene classification. Inspect this measure also in DEGs and not DEGs separately
+```{r expression ratio of the two conditions}
+#in the dataset with the subset of genes you do not need to run this command
+#vst_mean <- vst_mean[vst_mean$Control+vst_mean$C2d >0,]
+
+# COMPARE 80 VS C2D FOR LONG AND SHORT INTRONS
+# compute the ratio of expression and create a new column -> easier to compare the expression of the same gene in two conditions
+#vst_mean$ratio_C2d_80 <- vst_mean$C2d / vst_mean$`80%`
+#vst_mean$log_ratio_C2d_80 <- log1p(vst_mean$ratio_C2d_80)
+#log(A/B)= log(A)-log(B)
+vst_all_mean$log_ratio_C2d_80 <- vst_all_mean$C2d - vst_all_mean$Control
+ratio <- ggboxplot(vst_all_mean, x="type", y="log_ratio_C2d_80", main="Ratio of the expression of long and short\ntranscripts in C2d vs 80%", ylab="gene expression ratio", notch=TRUE, color = "type", ylim=c(-6,10), palette=c("#F8766D","#619CFF","#00BA38"))
+ratio + stat_compare_means(label.y=10)
+
+
+#COMPARE DEG AND NOT DEG 80 VS C2D FOR LONG AND SHORT INTRONS
+deg <- read.csv(here("data/analysis/DE/DE-C2dvs80-lfc2-genes.csv"))
+deg <- deg %>% rename(Gene = X)
+
+vst_deg <- vst_all_mean %>% filter(Gene %in% deg$Gene)
+ratio <- ggboxplot(vst_deg, x="type", y="log_ratio_C2d_80", main="Ratio of the expression of long and short\ntranscripts of DEG in C2d vs 80%", ylab="gene expression ratio", notch=TRUE, color = "type", ylim=c(-6,10), palette=c("#F8766D","#619CFF","#00BA38"))
+
+
+vst_not_deg <- vst_all_mean %>% filter(!Gene %in% deg$Gene)
+ratio <- ggboxplot(vst_not_deg, x="type", y="log_ratio_C2d_80", main="Ratio of the expression of long and short\ntranscripts of not DEG in C2d vs 80%", ylab="gene expression ratio",  notch=TRUE, color = "type", ylim=c(-6,10), palette=c("#F8766D","#619CFF","#00BA38"))
+ratio + stat_compare_means(label.y=10)
+```
+
+* Look at the gene classification for the highest expressed genes (considering all the genes)
+```{r gene expression related to the intron length}
+#considering all the genes
+#it should already be ordered but it's always better to be sure
+load(here("data/analysis/DE/vst-aware_lengthScaledTPM.rda"))
+colnames(vst) <- samples$SampleName
+vst <- as_tibble(vst, rownames= "Gene")
+
+vst <- vst %>% mutate(mean_expr=rowMeans(vst[,2:29]))
+
+vst <- vst %>% mutate(type=ifelse(Gene %in% tx2gene_short$GENE,"short", ifelse(Gene %in% tx2gene_long$GENE,"long", "no introns")))
+
+vst$type <- factor(vst$type, levels=c("long","short","no introns"))
+
+#take the 10% highest expressed genes in control
+high_expr <- vst %>% slice_max(mean_expr, n=4391)
+
+#take the 10% lowest expressed genes in control
+#low_expr <- vst %>% slice_min(mean_expr, n=4391)
+
+ggboxplot(high_expr, x="type",y="mean_expr" ,ylab="Normalized gene expression", color= "type", main="Gene classification in the highest expressed genes", palette=c("#F8766D","#619CFF","#00BA38"), notch=TRUE) + stat_compare_means()
+
+ggboxplot(high_expr, x="type",y="mean_expr" ,ylab="Normalized gene expression", color= "type", palette=c("#F8766D","#619CFF","#00BA38"), notch=TRUE) + stat_compare_means()
+
+```
+
+
+# Perform a statistical test 
+## Perform a Fisher test on the number of DEGs
+```{r DEG in C2d vs 80}
+#Analysis of DEG -> enrichment of DEG with long/short introns in C2d and 80 (as background consider all genes that pass the test not all genes in the genome)
+deg <- read.csv(here("data/analysis/DE/DE-C2dvs80-lfc2-genes.csv"))
+
+deg_long <- deg %>% filter(X %in% tx2gene_long$GENE)
+deg_short <- deg %>% filter(X %in% tx2gene_short$GENE)
+ 
+not_deg <- setdiff(common_genes, deg$X)
+
+not_deg_long <- intersect(not_deg, tx2gene_long$GENE)
+not_deg_short <- intersect(not_deg, tx2gene_short$GENE)
+
+#if you sum deg_long and deg_short the value is different from deg -> there are deg with no introns!!!!!!!!
+#in addition do not consider just genes in the tx2gene object because there are also genes that are expressed in both conditions
+
+#Test that genes with long introns are more likely to be DE in response to drought stress
+#deg long 1191, deg short 3536, not deg long 11447, not deg short 12703
+
+contingency_table <- matrix(c(1191,3536,11447,12703), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("DEG", "not DEG")))
+fisher.test(contingency_table, simulate.p.value = TRUE)
+
+mosaicplot(contingency_table, color=TRUE)
+vcd::assoc(t(contingency_table),shade=TRUE)
+
+```
+
+## Perform a Fisher test on the number of up-regulated and down-regulated DEGs
+```{r Fisher on up-regulated genes}
+#upregulated genes in C2d
+deg_up <- deg %>% filter(log2FoldChange>0)
+
+deg_up_long <- deg_up %>% filter(X %in% tx2gene_long$GENE) 
+deg_up_short <- deg_up %>% filter(X %in% tx2gene_short$GENE)
+
+deg_down <- deg %>% filter(log2FoldChange<0) 
+deg_down_long <- deg_down %>% filter(X %in% tx2gene_long$GENE)
+deg_down_short <- deg_down %>% filter(X %in% tx2gene_short$GENE)
+  
+contingency_table_deg <- matrix(c(424,905,767, 2631), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"),c("up", "down"))) 
+
+fisher.test(contingency_table_deg, simulate.p.value = TRUE)
+
+vcd::assoc(t(contingency_table_deg),shade=TRUE)
+
+mosaicplot(contingency_table_deg, color=TRUE)
+```
+
