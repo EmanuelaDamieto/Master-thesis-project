@@ -49,7 +49,7 @@ tx2gene_short <- tx2gene %>% filter(TXID %in% short_introns_id$ID)
 #transcript without introns are discarded
 
 #Import the vst file 
-load(here("data/analysis/DE/vst-aware_lengthScaledTPM.rda"))
+load(here("data/analysis/DE/vst-aware.rda"))
 samples <- read_csv(here("data/drought_roots.csv"),
                       col_types=cols(.default=col_factor()))
 
@@ -101,7 +101,7 @@ write.table(common_genes, here("data/analysis/common_genes.txt")) #31935
 # Import the expression file with the subset of genes expressed in both conditions
 * Look at the gene expression in control and severe drought stress condition (c2d) taking in consideration the classification of the gene (long introns, short introns, no introns)
 ```{r comparison of the expression between cnt vs c2d}
-load(here("data/analysis/DE/vst-aware-lengthScaledTPM_exprGenes.rda"))
+load(here("data/analysis/DE/vst-aware-exprGenes.rda"))
 colnames(vst) <- samples$SampleName
 vst <- as_tibble(vst, rownames= "Gene") 
 
@@ -146,6 +146,7 @@ deg <- deg %>% rename(Gene = X)
 
 vst_deg <- vst_all_mean %>% filter(Gene %in% deg$Gene)
 ratio <- ggboxplot(vst_deg, x="type", y="log_ratio_C2d_80", main="Ratio of the expression of long and short\ntranscripts of DEG in C2d vs 80%", ylab="gene expression ratio", notch=TRUE, color = "type", ylim=c(-6,10), palette=c("#F8766D","#619CFF","#00BA38"))
+ratio + stat_compare_means(label.y=10)
 
 
 vst_not_deg <- vst_all_mean %>% filter(!Gene %in% deg$Gene)
