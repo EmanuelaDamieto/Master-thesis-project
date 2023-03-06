@@ -158,7 +158,7 @@ ratio + stat_compare_means(label.y=10)
 ```{r gene expression related to the intron length}
 #considering all the genes
 #it should already be ordered but it's always better to be sure
-load(here("data/analysis/DE/vst-aware_lengthScaledTPM.rda"))
+load(here("data/analysis/DE/vst-aware.rda"))
 colnames(vst) <- samples$SampleName
 vst <- as_tibble(vst, rownames= "Gene")
 
@@ -176,7 +176,6 @@ high_expr <- vst %>% slice_max(mean_expr, n=4391)
 
 ggboxplot(high_expr, x="type",y="mean_expr" ,ylab="Normalized gene expression", color= "type", main="Gene classification in the highest expressed genes", palette=c("#F8766D","#619CFF","#00BA38"), notch=TRUE) + stat_compare_means()
 
-ggboxplot(high_expr, x="type",y="mean_expr" ,ylab="Normalized gene expression", color= "type", palette=c("#F8766D","#619CFF","#00BA38"), notch=TRUE) + stat_compare_means()
 
 ```
 
@@ -199,9 +198,10 @@ not_deg_short <- intersect(not_deg, tx2gene_short$GENE)
 #in addition do not consider just genes in the tx2gene object because there are also genes that are expressed in both conditions
 
 #Test that genes with long introns are more likely to be DE in response to drought stress
-#deg long 1191, deg short 3536, not deg long 11447, not deg short 12703
+#deg long 1191, deg short 3536, not deg long 12557, not deg short 16924
 
-contingency_table <- matrix(c(1191,3536,11447,12703), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("DEG", "not DEG")))
+contingency_table <- matrix(c(1191,3536,12557,16924), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("DEG", "not DEG")))
+
 fisher.test(contingency_table, simulate.p.value = TRUE)
 
 mosaicplot(contingency_table, color=TRUE)
