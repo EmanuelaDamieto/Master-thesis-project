@@ -159,7 +159,9 @@ ggplot(df_chr, aes(seqid, counts))+
 ## Look at the relationship between CDS and intron length 
 ```{r CDS vs intron length, echo=FALSE}
 #Retrieve the transcript ID (parent)
-parent_cds <- sub(".*=","",cds$attributes)
+parent_cds <- sub(".*Parent=","",cds$attributes)
+parent_cds <- sub(";.*","",parent_cds)
+
 
 #Include transcript ID, length and counts table
 cds$parent <- parent_cds
@@ -237,6 +239,9 @@ cds_violinplot <- ggviolin(introns_mrna_cds, x="type", y="length", yscale="log10
 cds_violinplot + stat_compare_means(label.y.npc = "top", label.x.npc="centre")
 
 
+```
+```{r}
+setdiff(df_long_introns_cum$parent,df_long_cds_cum$parent)
 ```
 
 

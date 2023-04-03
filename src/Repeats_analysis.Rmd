@@ -168,7 +168,7 @@ ggplot(repeats_tr_cds, aes(type, fill=repeat.class.family))+
   geom_bar(position="fill", color="gray")+
   theme_classic()+
   theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1))+
-  labs(y="Percentage", fill="Repeat class family")
+  labs(y="Proportion", fill="Repeat class family")
 
 #create two dataset for the different intron types 
 repeats_long_cds <- repeats_tr_cds %>% filter(attributes_cds %in% long_introns$ID) 

@@ -109,7 +109,7 @@ colnames(counts) <- samples_rep$Filenames
 counts <- as.data.frame(counts)
 
 #' * Import the list of the genes expressed in the control and C2d condition to avoid bias
-expr_genes <- read.table(here("data/analysis/expressed_genes.txt"))
+expr_genes <- read.table(here("data/analysis/common_genes.txt"))
 colnames(expr_genes) <- "Genes"
 counts <- filter(counts, rownames(counts) %in% expr_genes$Genes)
 

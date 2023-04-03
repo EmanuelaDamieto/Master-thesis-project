@@ -89,13 +89,19 @@ no_expr_cnt <- filter(vst_all_mean, `80%`==0)
 #In a Venn diagram every part of the circle is independent!
 #not_expr_C2d=10275-6566=3709, not_expr_CNT=8365-6566=1799
 
-plot(euler(c("control" = 3709, "C2d" = 1799, "control&C2d" = 6566), shape = "ellipse"),c("palegreen","plum1"), labels = list(font=1, cex=1), counts=TRUE,ills =list(fill=c(viridis::plasma(n = 3))), alpha = 0.3,  quantities=list(type = c("counts"), font=3, round=2, cex=0.8))
+plot(euler(c("control" = 3708, "C2d" = 1697, "control&C2d" = 6561), shape = "ellipse"),c("palegreen","plum1"), labels = list(font=1, cex=1), counts=TRUE,ills =list(fill=c(viridis::plasma(n = 3))), alpha = 0.3,  quantities=list(type = c("counts"), font=3, round=2, cex=0.8))
 
 #keep the ones that are expressed in C2d 
-not_common_genes <- union(no_expr_c2d, no_expr_cnt) #10275+8265-6566
-expr_common <- vst_all_mean %>% filter(!Gene %in% not_common_genes$Gene)  #43909-(10275+8265-6566)
+not_common_genes <- union(no_expr_c2d$Gene, no_expr_cnt$Gene) #10275+8265-6566
+expr_common <- vst_all_mean %>% filter(!Gene %in% not_common_genes)  #43909-(10275+8265-6566)
 common_genes <- expr_common$Gene
 write.table(common_genes, here("data/analysis/common_genes.txt")) #31935
+
+just_expr_c2d <- setdiff(no_expr_cnt$Gene,no_expr_both$Gene)
+write.table(just_expr_c2d, here("data/analysis/expr_c2d.txt"))
+just_expr_cnt <- setdiff(no_expr_c2d$Gene,no_expr_both$Gene)
+write.table(just_expr_cnt, here("data/analysis/expr_cnt.txt"))
+
 ```
 
 # Import the expression file with the subset of genes expressed in both conditions
@@ -198,9 +204,9 @@ not_deg_short <- intersect(not_deg, tx2gene_short$GENE)
 #in addition do not consider just genes in the tx2gene object because there are also genes that are expressed in both conditions
 
 #Test that genes with long introns are more likely to be DE in response to drought stress
-#deg long 1191, deg short 3536, not deg long 12557, not deg short 16924
+#deg long 1191, deg short 3536, not deg long 11449, not deg short 12708
 
-contingency_table <- matrix(c(1191,3536,12557,16924), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("DEG", "not DEG")))
+contingency_table <- matrix(c(1191,3536,11449,12708), nrow=2, ncol = 2, dimnames = list(c("genes with long introns", "genes with short introns"), c("DEG", "not DEG")))
 
 fisher.test(contingency_table, simulate.p.value = TRUE)
 

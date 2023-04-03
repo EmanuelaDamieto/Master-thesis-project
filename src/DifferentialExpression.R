@@ -411,16 +411,18 @@ contrast_C2d_vs_80 <- extract_results(dds=dds,vst=vst,contrast="Level_C2d_vs_80.
 #' Use all the genes as background 
 background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.0)]
 
-res.list <- read.table(here("data/analysis/just_expr_C2d.txt"))
-bla_enr <- gopher(res.list$V1, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
+#res.list <- read.table(here("data/analysis/just_expr_C2d.txt"))
+res.list <- read.table(here("data/analysis/expr_c2d.txt"))
+bla_enr <- gopher(res.list$x, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
 dev.null <- extractEnrichmentResults(bla_enr,
                                     url="piceab02")
 
 
 #' #### GO of genes expressed just in the control 
 #' Use all the genes as background 
-res.list_cnt <- read.table(here("data/analysis/just_expr_cnt.txt"))
-bla_enr_cnt <- gopher(res.list_cnt$V1, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
+#res.list_cnt <- read.table(here("data/analysis/just_expr_cnt.txt"))
+res.list_cnt <- read.table(here("data/analysis/expr_cnt.txt"))
+bla_enr_cnt <- gopher(res.list_cnt$x, alpha = 0.05, task="go", background = background, url="picab02", endpoint = "enrichment")
 dev.null <- extractEnrichmentResults(bla_enr_cnt,
                                      url="piceab02")
 

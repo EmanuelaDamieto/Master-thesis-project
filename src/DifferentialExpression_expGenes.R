@@ -453,18 +453,18 @@ text(seq(1.5, end_point, by=2), par("usr")[3]-0.25, srt=60, adj=1, xpd=TRUE, lab
 #' ### GO of all, up and down regulated genes of the last contrast (log2fc=2)
 background <- rownames(vst)[featureSelect(vst,dds$Level,exp=0.4)]
 
-res.list <- contrast_C2d_vs_80
+res.list <- contrast_C2d_vs_80_l2fc2
 
 enr.list <- lapply(res.list, gopher,background=background, alpha=0.05, task="go",url="picab02", endpoint = "enrichment")
 
 #' #### Go of all DE genes
-dev.null <- extractEnrichmentResults(enr.list$all, diff.exp= "all", url="piceab02")
+dev.null <- extractEnrichmentResults(enr.list$all, diff.exp= "all", url="piceab02", default_prefix = "log2FC")
 
 #' #### Go of upregulated DE genes
-dev.null <- extractEnrichmentResults(enr.list$up, diff.exp= "up", url="piceab02")
+dev.null <- extractEnrichmentResults(enr.list$up, diff.exp= "up", url="piceab02", default_prefix = "log2FC")
 
 #' #### Go of downregulated DE genes
-dev.null <- extractEnrichmentResults(enr.list$dn, diff.exp= "dn", url="piceab02")
+dev.null <- extractEnrichmentResults(enr.list$dn, diff.exp= "dn", url="piceab02",default_prefix = "log2FC")
 
 #' Note: up and down refers to C2d so the upregulated genes are upregulated in C2d and the same is true for the downregulated one
 

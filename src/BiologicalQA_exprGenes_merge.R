@@ -116,7 +116,7 @@ colnames(counts) <- csamples$SciLifeID
 counts <- as.data.frame(counts)
 
 #' * Keep only the expressed genes in both conditions 
-expr_genes <- read.table(here("data/analysis/expressed_genes.txt"))
+expr_genes <- read.table(here("data/analysis/common_genes.txt"))
 colnames(expr_genes) <- "Genes"
 counts <- filter(counts, rownames(counts) %in% expr_genes$Genes)
 
