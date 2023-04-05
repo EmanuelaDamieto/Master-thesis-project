@@ -2,7 +2,19 @@
 title: "Exploration annotation file"
 author: "Emanuela Damieto"
 date: "`r Sys.Date()`"
-output: html_document
+output: 
+    html_document:
+      fig_width: 9
+      fig_height: 6
+      toc: true
+      number_sections: true
+      toc_depth: 4
+      toc_float:
+        collapsed: TRUE
+        smooth_scroll: TRUE
+      code_folding: hide
+      theme: "flatly"
+      highlight: pygments
 ---
 
 ```{r setup, include=FALSE}
@@ -15,9 +27,9 @@ library("stringr")
 library("tidyr")
 ```
 
-## Import data
+# Data import
 Import the annotation file
-```{r import annotation file, echo=FALSE}
+```{r import annotation file}
 #Set the directory and import the data
 
 spruce_pine <- read.table(gzfile(here("reference/gff3/Picab02_codingAll.gff3.gz")), sep = "\t", quote="")
@@ -39,8 +51,8 @@ mrna <- subset(spruce_pine, type=="mRNA")
 # write_gff3(introns,here("data/gff3/introns.gff3"))
 ```
 
-## Compare the cumulative intron length with the number of introns
-```{r comparison intron length vs # of intorns, echo=FALSE}
+# Compare the cumulative intron length with the number of introns
+```{r comparison intron length vs # of intorns}
 #Retrieve the transcript ID (parent)
 parent <- sub(".*=","",introns$attributes)
 #Look at the transcript with the highest number of introns (74)
@@ -67,8 +79,8 @@ comparisonplot(df_introns_cum$counts, log10(df_introns_cum$length), xlab ="numbe
 
 ```
 
-
-```{r median cumulative long vs short, echo=FALSE}
+Compare the median of transcripts with long and short introns
+```{r median cumulative long vs short}
 #set the threshold of log intron length to 4 to split in long and short introns
 long_introns <- df_introns_cum %>% filter(log10(length)>=4)
 short_introns <- df_introns_cum %>% filter(log10(length)<4)
@@ -101,8 +113,8 @@ ggplot(median, aes(counts, length, color=type))+
 ```
 
 
-## Use another measure of intron length (weighted intron length)
-```{r weighted intron length, echo=FALSE}
+# Use another measure of intron length (weighted intron length)
+```{r weighted intron length}
 df_introns_weig <- df_introns %>% summarise(
   counts= sum(counts),
   seqid=unique(seqid),
@@ -134,8 +146,8 @@ ggplot(median, aes(counts, length, color=type))+
 
 ```
 
-## Look at the distribution of intron length and counts along the genome
-```{r distribition along the chromosome of intron length, echo=FALSE}
+# Look at the distribution of intron length and counts along the genome
+```{r distribition along the chromosome of intron length}
 #remove the introns that are not present in chromosomes
 df_chr <- df_introns_cum %>% filter(str_detect(seqid,  regex(paste0("^PA_chr[0-9]{2}$"))))
 
@@ -156,8 +168,8 @@ ggplot(df_chr, aes(seqid, counts))+
 ```
 
 
-## Look at the relationship between CDS and intron length 
-```{r CDS vs intron length, echo=FALSE}
+# Look at the relationship between CDS and intron length 
+```{r CDS vs intron length}
 #Retrieve the transcript ID (parent)
 parent_cds <- sub(".*Parent=","",cds$attributes)
 parent_cds <- sub(";.*","",parent_cds)
@@ -184,10 +196,10 @@ merge_cds_intron <- df_cds_cum %>% full_join(df_introns_cum, by="parent", suffix
 comparisonplot(log10(merge_cds_intron$length.cds), log10(merge_cds_intron$length.intron), xlab="CDS length (log scale)", ylab="Intron length (log scale)", main="Comparisonplot of CDS length vs intron length in log scale")
 ```
 
-## Compare long and short intron length
-Compare the cumulative length of introns in transcripts with long and short introns (or compare the length of introns in transcripts with long and short cumulative intron length)
+# Compare long and short intron length
+Compare the cumulative length of introns in transcripts with long and short introns
 
-```{r long vs short introns, echo=FALSE, warning=FALSE}
+```{r long vs short introns, warning= FALSE}
 #comparison intron length in short vs long introns 
 mrna <- mrna %>% separate(attributes, c("ID", "Parent", "Others"), ";") %>% mutate (ID= sub("ID=","", ID), Parent= sub("Parent=","",Parent), Others= sub("Others=","",Others))
 mrna$mrna_length <- mrna$end-mrna$start+1
@@ -212,10 +224,10 @@ intron_violinplot + stat_compare_means(label.y.npc = "top", label.x.npc="centre"
 
 ```
 
-## Compare long and short CDS length
-Compare the cumulative length of CDS in transcripts with long and short introns (or compare the length of introns in transcripts with long and short cumulative intron length)
+# Compare long and short CDS length
+Compare the cumulative length of CDS in transcripts with long and short introns
 
-```{r CDS long vs short introns, echo=FALSE, warning=FALSE}
+```{r CDS long vs short introns}
 #divide the dataset in long and short introns
 df_long_cds_cum <- df_cds_cum%>% filter(parent %in% long_introns_id,)
 df_short_cds_cum <- df_cds_cum %>% filter(parent %in% short_introns_id,)
@@ -239,9 +251,6 @@ cds_violinplot <- ggviolin(introns_mrna_cds, x="type", y="length", yscale="log10
 cds_violinplot + stat_compare_means(label.y.npc = "top", label.x.npc="centre")
 
 
-```
-```{r}
-setdiff(df_long_introns_cum$parent,df_long_cds_cum$parent)
 ```
 
 
