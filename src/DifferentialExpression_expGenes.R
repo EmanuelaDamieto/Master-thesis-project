@@ -344,6 +344,7 @@ resultsNames(dds)
 #' 
 #' ```
 
+par(mar=c(1,1,1,1))
 #' ```{r contrast, echo=TRUE,eval=FALSE}
 #' Evaluate the contrast C2d vs 80, the 80% water content in the soil is our control.
 #' ```
@@ -392,38 +393,6 @@ barplot(t(matrix_contrast), main="Number of DEG in different contrasts", ylab="N
              col=colors, las=2, cex.names = 0.6, cex.axis = 0.8)
 legend("topleft", colnames(matrix_contrast), cex=0.8, fill=colors)
 text(seq(1.5, end_point, by=2), par("usr")[3]-0.25, srt=60, adj=1, xpd=TRUE, labels=paste(rownames(matrix_contrast)), cex=0.7)
-#' ## Venn Diagram
-#' ```{r venn, echo=FALSE,eval=FALSE}
-#' CHANGEME - Here, you typically would have run several contrasts and you want
-#' to assess their overlap plotting VennDiagrams.
-#' 
-#' In the examples below, we assume that these resutls have been saved in a list
-#' called `res.list`
-#' ```
-
-#' #### All DE genes
-#' ```{r venn1, echo=FALSE,eval=FALSE}
-#' grid.newpage()
-#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","all"),
-#'                       NULL,
-#'                       fill=pal[1:3]))
-#' ```
-
-#' #### DE genes (up in mutant)
-#' ```{r venn2, echo=FALSE,eval=FALSE}
-#' grid.newpage()
-#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","up"),
-#'                        NULL,
-#'                        fill=pal[1:3]))
-#' ```
-
-#' #### DE genes (up in control)
-#' ```{r venn3, echo=FALSE,eval=FALSE}
-#' grid.newpage()
-#' grid.draw(venn.diagram(lapply(contrast_C2d_vs_80,"[[","dn"),
-#'                        NULL,
-#'                        fill=pal[1:3]))
-#' ```
 
 #' ## Gene Ontology enrichment
 #' ```{r go, echo=FALSE,eval=FALSE}
