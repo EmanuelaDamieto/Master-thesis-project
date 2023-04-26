@@ -5,9 +5,9 @@
 - pipeline: contains the bash script to submit and run tools
 - reference: contains files required to perform the analysis
 - results: contain the results of the tools used
-- singularity: conain singularity containers
+- singularity: contains singularity containers
 - src: contains R script used to perform the data analysis and the HTML documents originated from them
-- UPSCb-common: repository containing functions and script templates
+- UPSCb-common: a repository containing functions and script templates
 
 
 ## Set up
